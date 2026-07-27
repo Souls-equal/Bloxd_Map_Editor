@@ -54,27 +54,15 @@ window.TerrainManager = class TerrainManager {
         if (extension === 'bloxdschem') {
             const buffer = await file.arrayBuffer();
             if (token !== this.importToken) return null;
-            const header = this._peekBloxdHeader(buffer);
-            const area = Math.max(0, header.size.x) * Math.max(0, header.size.z);
-            if (area > this.largeAreaThreshold) {
-                return await this._importBloxdAsHeightmap(buffer, file.name, token, header);
-            }
             if (!window.BloxdIO) throw new Error('BloxdIO parser is not loaded.');
             const parsed = window.BloxdIO.parseSchem(buffer);
             const converted = this._convertBloxdSchemToBlockList(parsed);
-            if (converted.blocks.length > this.largeBlockThreshold || converted.size.x * converted.size.z > this.largeAreaThreshold) {
-                return await this._importBlockListAsHeightmap(converted, file.name, token);
-            }
             return this.setTerrain(converted, file.name);
         }
 
         const text = await file.text();
         if (token !== this.importToken) return null;
         const parsed = window.parseSchem(text);
-        const area = (parsed.size?.x || 0) * (parsed.size?.z || 0);
-        if ((parsed.blocks?.length > this.largeBlockThreshold) || area > this.largeAreaThreshold) {
-            return await this._importBlockListAsHeightmap(parsed, file.name, token);
-        }
         return this.setTerrain(parsed, file.name);
     }
 
@@ -181,15 +169,100 @@ window.TerrainManager = class TerrainManager {
     async _processTileBuildQueue(){ /* ... */ }
     _buildHeightTileMesh(tile, key){ /* ... */ }
     _yieldToBrowser(){ return new Promise(r => setTimeout(r,0)); }
-    _peekBloxdHeader(buffer){ /* ... */ }
-    _readUvarint(buf,off){ /* ... */ }
-    _readAvroInt(buf,off){ /* ... */ }
-    _readAvroString(buf,off){ /* ... */ }
-    _readAvroBytesView(buf,off){ /* ... */ }
-    _decodeChunkRLEToHeightmap(rleBytes,bx0,by0,bz0){ /* ... */ }
-    _convertBloxdSchemToBlockList(parsed){ /* ... */ }
-    _normalizeBlockList(blocks,inputSize){ /* ... */ }
-    _buildOptimizedTerrainMesh(blocks,size,fileName){ /* ... */ }
-    _shadeColor(color,normal){ /* ... */ }
-    _getBlockColor01(id){ /* ... */ }
+    _peekBloxdHeader(buffer){ return null; }
+    _readUvarint(buf,off){ return 0; }
+    _readAvroInt(buf,off){ return 0; }
+    _readAvroString(buf,off){ return ''; }
+    _readAvroBytesView(buf,off){ return new Uint8Array(0); }
+    _decodeChunkRLEToHeightmap(){ return; }
+
+    // Map<cléChunk, Int32Array> -> [{x,y,z,id}] (format attendu par le reste du code).
+    _convertBloxdSchemToBlockList(parsed) {
+        if (!parsed || !parsed.blocks) return parsed;
+        if (Array.isArray(parsed.blocks)) return parsed;
+        if (typeof parsed.blocks.forEach !== 'function') return parsed;
+        const CHUNK = 32, out = [];
+        parsed.blocks.forEach((arr, key) => {
+            if (!arr) return;
+            const p = key.split(',');
+            const bX = (+p[0]) * CHUNK, bY = (+p[1]) * CHUNK, bZ = (+p[2]) * CHUNK;
+            for (let lx = 0; lx < CHUNK; lx++)
+                for (let ly = 0; ly < CHUNK; ly++)
+                    for (let lz = 0; lz < CHUNK; lz++) {
+                        const id = arr[lx * 1024 + ly * 32 + lz];
+                        if (id !== 0) out.push({ x: bX + lx, y: bY + ly, z: bZ + lz, id });
+                    }
+        });
+        return Object.assign({}, parsed, { blocks: out });
+    }
+
+    // Recentrer les blocs sur l'origine + taille réelle.
+    _normalizeBlockList(blocks, inputSize) {
+        if (!blocks || !blocks.length) return { blocks: [], size: { x: 0, y: 0, z: 0 } };
+        let mnX = Infinity, mnY = Infinity, mnZ = Infinity, mxX = -Infinity, mxY = -Infinity, mxZ = -Infinity;
+        for (const b of blocks) {
+            if (b.x < mnX) mnX = b.x; if (b.y < mnY) mnY = b.y; if (b.z < mnZ) mnZ = b.z;
+            if (b.x > mxX) mxX = b.x; if (b.y > mxY) mxY = b.y; if (b.z > mxZ) mxZ = b.z;
+        }
+        const out = new Array(blocks.length);
+        for (let i = 0; i < blocks.length; i++) {
+            const b = blocks[i];
+            out[i] = { x: b.x - mnX, y: b.y - mnY, z: b.z - mnZ, id: b.id, data: b.data || 0 };
+        }
+        const size = (inputSize && inputSize.x)
+            ? { x: inputSize.x | 0, y: inputSize.y | 0, z: inputSize.z | 0 }
+            : { x: mxX - mnX + 1, y: mxY - mnY + 1, z: mxZ - mnZ + 1 };
+        return { blocks: out, size };
+    }
+
+    _getBlockColor01(id) {
+        const c = (window.BloxdIO && window.BloxdIO.getBlockColor) ? window.BloxdIO.getBlockColor(id) : 0x8a8a8a;
+        return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
+    }
+
+    // Mesh du terrain : cubes complets si petit, sinon surface (1 quad/colonne) pour rester léger.
+    _buildOptimizedTerrainMesh(blocks, size, fileName) {
+        if (!blocks || !blocks.length) return null;
+        // Petit terrain : on réutilise le mergeur de cubes de l'asset placer.
+        if (blocks.length <= 60000 && window.createMeshFromSchem) {
+            const mesh = window.createMeshFromSchem(this.scene, { blocks, size });
+            if (mesh) { mesh.name = fileName || 'terrain'; mesh.isPickable = true; mesh.metadata = Object.assign({}, mesh.metadata, { isTerrain: true }); }
+            return mesh;
+        }
+        // Gros terrain : on ne dessine que le dessus (top block de chaque colonne X,Z).
+        const cols = new Map();
+        for (const b of blocks) {
+            const k = b.x + ',' + b.z;
+            const c = cols.get(k);
+            if (!c || b.y > c.y) cols.set(k, { y: b.y, id: b.id });
+        }
+        const positions = [], indices = [], normals = [], colors = [];
+        let vi = 0;
+        const fp = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5];
+        const fi = [0, 2, 1, 0, 3, 2];
+        for (const [k, c] of cols) {
+            const p = k.split(','); const x = +p[0], z = +p[1], y = c.y;
+            const col = this._getBlockColor01(c.id);
+            for (let i = 0; i < fp.length; i += 3) positions.push(fp[i] + x + 0.5, fp[i + 1] + y + 1, fp[i + 2] + z + 0.5);
+            for (let i = 0; i < fi.length; i++) indices.push(fi[i] + vi);
+            for (let v = 0; v < 4; v++) { normals.push(0, 1, 0); colors.push(col.r, col.g, col.b, 1); }
+            vi += 4;
+        }
+        const vd = new BABYLON.VertexData();
+        vd.positions = new Float32Array(positions);
+        vd.indices = positions.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+        vd.normals = new Float32Array(normals);
+        vd.colors = new Float32Array(colors);
+        const mesh = new BABYLON.Mesh(fileName || 'terrain', this.scene);
+        vd.applyToMesh(mesh);
+        const mat = new BABYLON.StandardMaterial('terrainMat', this.scene);
+        mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        mat.useVertexColors = true;
+        mesh.material = mat;
+        mesh.isPickable = true;
+        mesh.metadata = { isTerrain: true };
+        return mesh;
+    }
+
+    _shadeColor(color, normal) { return color; }
 };
