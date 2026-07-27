@@ -33,11 +33,14 @@ function colorFromHex(hex) {
 }
 
 function getBlockColor(id) {
+    // Palette fidèle BlockColors (identique au Terrain Editor) en priorité.
+    if (window.BlockColors && typeof window.BlockColors.getBlockColor === 'function') {
+        return colorFromHex(window.BlockColors.getBlockColor(id));
+    }
     if (ASSET_BLOCK_COLORS[id] !== undefined) {
         return colorFromHex(ASSET_BLOCK_COLORS[id]);
     }
-    // Fallback : couleur déterministe variée. (La palette BloxdIO est incomplète
-    // et renvoyait du tan uniforme → tout le terrain semblait sans couleur.)
+    // Fallback : couleur déterministe variée.
     const r = ((id * 37) % 90 + 90) / 255;
     const g = ((id * 73) % 90 + 85) / 255;
     const b = ((id * 109) % 70 + 70) / 255;
