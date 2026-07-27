@@ -54,6 +54,12 @@ window.TerrainManager = class TerrainManager {
         if (extension === 'bloxdschem') {
             const buffer = await file.arrayBuffer();
             if (token !== this.importToken) return null;
+            const header = this._peekBloxdHeader(buffer);
+            const area = Math.max(0, header.size.x) * Math.max(0, header.size.z);
+            // Grande map → parse STREAMING + surface (évite le crash mémoire).
+            if (area > this.largeAreaThreshold) {
+                return await this._importBloxdAsHeightmap(buffer, file.name, token);
+            }
             if (!window.BloxdIO) throw new Error('BloxdIO parser is not loaded.');
             const parsed = window.BloxdIO.parseSchem(buffer);
             const converted = this._convertBloxdSchemToBlockList(parsed);
@@ -89,6 +95,7 @@ window.TerrainManager = class TerrainManager {
         for (const mesh of this.tileMeshes.values()) { mesh.material?.dispose(); mesh.dispose(); }
         if (this.terrainSelectionProxy) { this.terrainSelectionProxy.material?.dispose(); this.terrainSelectionProxy.dispose(); this.terrainSelectionProxy = null; }
         this.tileMeshes.clear(); this.tileBuildQueue = []; this.tileBuildQueued.clear(); this.heightTiles.clear(); this.heightBounds = null;
+        this.heightSurface = null; this.heightOrigin = null;
         this.mode = 'none'; this.terrainData = null; this.terrainBlocks = []; this.terrainPosition.set(0, 0, 0);
         if (showDefaultGround) this._setDefaultGroundVisible(true);
         this._notifyChanged();
@@ -101,14 +108,11 @@ window.TerrainManager = class TerrainManager {
         }
         if (this.mode === 'heightmap') {
             const out = [], ox = Math.round(this.terrainPosition.x), oy = Math.round(this.terrainPosition.y), oz = Math.round(this.terrainPosition.z);
-            const NEG = this._negHeight();
-            for (const tile of this.heightTiles.values()) {
-                const baseX = tile.tx * this.tileSize, baseZ = tile.tz * this.tileSize;
-                for (let i = 0; i < tile.heights.length; i++) {
-                    const h = tile.heights[i];
-                    if (h === NEG) continue;
-                    const lx = i % this.tileSize, lz = Math.floor(i / this.tileSize);
-                    out.push({ x: baseX + lx + ox, y: h + oy, z: baseZ + lz + oz, id: tile.ids[i] || 1, data: 0, source: 'terrain-heightmap' });
+            const o = this.heightOrigin || { x: 0, y: 0, z: 0 };
+            if (this.heightSurface) {
+                for (const [key, c] of this.heightSurface) {
+                    const p = key.split(',');
+                    out.push({ x: (+p[0]) - o.x + ox, y: c.y - o.y + oy, z: (+p[1]) - o.z + oz, id: c.id, data: 0, source: 'terrain-heightmap' });
                 }
             }
             return out;
@@ -169,12 +173,84 @@ window.TerrainManager = class TerrainManager {
     async _processTileBuildQueue(){ /* ... */ }
     _buildHeightTileMesh(tile, key){ /* ... */ }
     _yieldToBrowser(){ return new Promise(r => setTimeout(r,0)); }
-    _peekBloxdHeader(buffer){ return null; }
-    _readUvarint(buf,off){ return 0; }
-    _readAvroInt(buf,off){ return 0; }
-    _readAvroString(buf,off){ return ''; }
-    _readAvroBytesView(buf,off){ return new Uint8Array(0); }
-    _decodeChunkRLEToHeightmap(){ return; }
+    _readUvarint(buf, off) {
+        let x = 0, s = 0;
+        for (let i = 0; i < 10; i++) {
+            if (off.v >= buf.length) break;
+            const b = buf[off.v++];
+            if (b < 0x80) return x | (b << s);
+            x |= (b & 0x7f) << s; s += 7;
+        }
+        return x;
+    }
+    _readAvroInt(buf, off) { const z = this._readUvarint(buf, off); return (z >>> 1) ^ -(z & 1); }
+    _readAvroString(buf, off) {
+        const len = this._readAvroInt(buf, off);
+        if (len < 0 || off.v + len > buf.length) return '';
+        const s = buf.subarray(off.v, off.v + len); off.v += len;
+        try { return new TextDecoder().decode(s); } catch (e) { return ''; }
+    }
+    _readAvroBytes(buf, off) {
+        const len = this._readAvroInt(buf, off);
+        if (len < 0 || off.v + len > buf.length) return new Uint8Array(0);
+        const s = buf.subarray(off.v, off.v + len); off.v += len;
+        return s;
+    }
+
+    // Lit uniquement l'en-tête (nom + position + taille) — pas les chunks. Très cheap.
+    _peekBloxdHeader(buffer) {
+        const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        const off = { v: 0 };
+        for (let i = 0; i < 4; i++) { if (buf[off.v] === 0) off.v++; else break; }
+        const name = this._readAvroString(buf, off);
+        const px = this._readAvroInt(buf, off), py = this._readAvroInt(buf, off), pz = this._readAvroInt(buf, off);
+        const sx = this._readAvroInt(buf, off), sy = this._readAvroInt(buf, off), sz = this._readAvroInt(buf, off);
+        return { name, pos: { x: px, y: py, z: pz }, size: { x: sx, y: sy, z: sz } };
+    }
+    _decodeChunkRLEToHeightmap() { return; }
+
+    // Parse STREAMING du .bloxdschem → heightmap (top block par colonne X,Z), SANS jamais
+    // matérialiser tous les blocs. Un seul scratch buffer de chunk à la fois → mémoire
+    // constante, même sur une 1000×1000. + yields pour garder l'UI réactive.
+    async _buildHeightmapFromBuffer(buffer) {
+        const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        const off = { v: 0 };
+        for (let i = 0; i < 4; i++) { if (buf[off.v] === 0) off.v++; else break; }
+        const name = this._readAvroString(buf, off);
+        const px = this._readAvroInt(buf, off), py = this._readAvroInt(buf, off), pz = this._readAvroInt(buf, off);
+        this._readAvroInt(buf, off); this._readAvroInt(buf, off); this._readAvroInt(buf, off); // sx,sy,sz ignorés
+        const CHUNK = 32;
+        const cols = new Map();            // "wx,wz" -> {y, id}
+        let mnX = Infinity, mxX = -Infinity, mnZ = Infinity, mxZ = -Infinity;
+        let processed = 0;
+        while (off.v < buf.length) {
+            let bc = this._readAvroInt(buf, off);
+            if (bc === 0) break;
+            if (bc < 0) { bc = -bc; this._readAvroInt(buf, off); }
+            for (let i = 0; i < bc; i++) {
+                const cx = this._readAvroInt(buf, off), cy = this._readAvroInt(buf, off), cz = this._readAvroInt(buf, off);
+                const rle = this._readAvroBytes(buf, off);
+                const baseX = px + cx * CHUNK, baseY = py + cy * CHUNK, baseZ = pz + cz * CHUNK;
+                let p = { v: 0 }, idx = 0;
+                while (idx < 32768 && p.v < rle.length) {
+                    const cnt = this._readUvarint(rle, p);
+                    const bid = this._readUvarint(rle, p);
+                    if (bid === 0) { idx += cnt; continue; }            // air → sauté
+                    for (let k = 0; k < cnt && idx < 32768; k++, idx++) {
+                        const lx = (idx / 1024) | 0, ly = ((idx % 1024) / 32) | 0, lz = idx % 32;
+                        const wx = baseX + lx, wy = baseY + ly, wz = baseZ + lz;
+                        const key = wx + ',' + wz;
+                        const c = cols.get(key);
+                        if (!c || wy > c.y) cols.set(key, { y: wy, id: bid });
+                        if (wx < mnX) mnX = wx; if (wx > mxX) mxX = wx;
+                        if (wz < mnZ) mnZ = wz; if (wz > mxZ) mxZ = wz;
+                    }
+                }
+            }
+            if ((++processed & 31) === 0) await this._yieldToBrowser();
+        }
+        return { name, cols, bounds: { minX: mnX, minZ: mnZ, maxX: mxX, maxZ: mxZ } };
+    }
 
     // Map<cléChunk, Int32Array> -> [{x,y,z,id}] (format attendu par le reste du code).
     _convertBloxdSchemToBlockList(parsed) {
@@ -265,4 +341,72 @@ window.TerrainManager = class TerrainManager {
     }
 
     _shadeColor(color, normal) { return color; }
+
+    // === GRANDES MAPS : heightmap streaming + surface ===
+    async _importBloxdAsHeightmap(buffer, fileName, token) {
+        const hm = await this._buildHeightmapFromBuffer(buffer);
+        if (token !== this.importToken) return null;
+        return this._setHeightmapTerrain(hm, fileName);
+    }
+
+    _setHeightmapTerrain(hm, fileName) {
+        this.clearTerrain(false);
+        this.mode = 'heightmap';
+        const cols = hm.cols, b = hm.bounds;
+        const minX = isFinite(b.minX) ? b.minX : 0;
+        const minZ = isFinite(b.minZ) ? b.minZ : 0;
+        let minY = Infinity; for (const v of cols.values()) if (v.y < minY) minY = v.y;
+        if (!isFinite(minY)) minY = 0;
+        const sx = Math.max(1, (isFinite(b.maxX) ? b.maxX : 0) - minX + 1);
+        const sz = Math.max(1, (isFinite(b.maxZ) ? b.maxZ : 0) - minZ + 1);
+        this.heightSurface = cols;                 // Map<"x,z" raw, {y,id}> pour l'export
+        this.heightOrigin = { x: minX, y: minY, z: minZ };
+        this.terrainData = { name: fileName, mode: 'heightmap', size: { x: sx, y: 1, z: sz }, totalColumns: cols.size };
+        this.terrainBlocks = [];
+        this.terrainPosition.set(-Math.floor(sx / 2), 0, -Math.floor(sz / 2));
+        const mesh = this._renderHeightmapSurface(cols, minX, minY, minZ, fileName);
+        if (mesh) { mesh.position.copyFrom(this.terrainPosition); this.terrainMesh = mesh; }
+        this._updateTerrainSelectionProxy();
+        this._setDefaultGroundVisible(false);
+        this._notifyChanged();
+        return this.terrainData;
+    }
+
+    // Surface : 1 quad (haut) par colonne. Tableaux typés pré-dimensionnés → mémoire bornée.
+    _renderHeightmapSurface(cols, minX, minY, minZ, fileName) {
+        const n = cols.size;
+        if (!n) return null;
+        const positions = new Float32Array(n * 12);
+        const indices = n * 6 > 65535 ? new Uint32Array(n * 6) : new Uint16Array(n * 6);
+        const normals = new Float32Array(n * 12);
+        const colors = new Float32Array(n * 16);
+        const fp = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5];
+        const fi = [0, 2, 1, 0, 3, 2];
+        let pi = 0, ii = 0, ni = 0, ci = 0, vi = 0;
+        for (const [key, c] of cols) {
+            const p = key.split(',');
+            const lx = (+p[0]) - minX, lz = (+p[1]) - minZ, ly = c.y - minY;
+            const col = this._getBlockColor01(c.id);
+            for (let v = 0; v < 4; v++) {
+                positions[pi++] = fp[v * 3] + lx + 0.5;
+                positions[pi++] = fp[v * 3 + 1] + ly + 1;
+                positions[pi++] = fp[v * 3 + 2] + lz + 0.5;
+                normals[ni++] = 0; normals[ni++] = 1; normals[ni++] = 0;
+                colors[ci++] = col.r; colors[ci++] = col.g; colors[ci++] = col.b; colors[ci++] = 1;
+            }
+            for (let i = 0; i < 6; i++) indices[ii++] = fi[i] + vi;
+            vi += 4;
+        }
+        const vd = new BABYLON.VertexData();
+        vd.positions = positions; vd.indices = indices; vd.normals = normals; vd.colors = colors;
+        const mesh = new BABYLON.Mesh(fileName || 'terrain', this.scene);
+        vd.applyToMesh(mesh);
+        const mat = new BABYLON.StandardMaterial('terrainSurfaceMat', this.scene);
+        mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        mat.useVertexColors = true;
+        mesh.material = mat;
+        mesh.isPickable = true;
+        mesh.metadata = { isTerrain: true };
+        return mesh;
+    }
 };
