@@ -11,6 +11,15 @@ window.addEventListener('DOMContentLoaded', () => {
     // Clavier piloté par le hub (clé partagée bloxdTools.keyboard)
     try { window.I18N.keyboard = localStorage.getItem('bloxdTools.keyboard') || 'azerty'; } catch(e) {}
 
+    // Couleurs fidèles des blocs : on initialise la palette BlockColors avec la
+    // table nom→id (→ chaque bloc retrouve sa vraie couleur, eau comprise).
+    if (window.BlockColors && typeof window.BlockColors.initFromNameMap === 'function') {
+        fetch('nameToId.json', { cache: 'force-cache' })
+            .then(r => r.ok ? r.json() : null)
+            .then(map => { if (map) window.BlockColors.initFromNameMap(map); })
+            .catch(() => {});
+    }
+
     const canvas = document.getElementById('renderCanvas');
     const canvasContainer = document.getElementById('canvas-container');
 
