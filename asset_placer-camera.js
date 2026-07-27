@@ -69,6 +69,20 @@ window.setupCamera = function(scene, canvas) {
         camera.setTarget(center);
     };
 
+    // Cadre le terrain (son milieu) — utilisé par 'F' quand aucun asset n'est sélectionné.
+    const focusTerrain = () => {
+        const tm = window.appTerrainManager;
+        if (!tm || !tm.hasTerrain()) return;
+        const info = tm.getTerrainFocusInfo();
+        const size = info.size || { x: 300, y: 1, z: 300 };
+        const maxXZ = Math.max(size.x || 300, size.z || 300);
+        const target = info.center.clone();
+        const distance = Math.min(4000, Math.max(120, maxXZ * 0.9));
+        const above = Math.min(3000, Math.max(80, maxXZ * 0.6));
+        camera.position.set(info.center.x, (info.maxY || 0) + above, info.center.z - distance);
+        camera.setTarget(target);
+    };
+
     window.addEventListener('keydown', (evt) => {
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
         const key = getEventKey(evt);
@@ -78,7 +92,11 @@ window.setupCamera = function(scene, canvas) {
 
         if (key === 'f') {
             evt.preventDefault();
-            focusSelected();
+            const sm = window.appSelectionManager;
+            const sel = sm && sm.selectedInstance;
+            // Asset sélectionné → on le cadre ; sinon → on cadre le terrain (son milieu).
+            if (sel && sel.mesh && !sel.isTerrainSelection) focusSelected();
+            else focusTerrain();
         }
         if (code === 'Space') evt.preventDefault();
     });
