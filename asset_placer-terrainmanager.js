@@ -292,8 +292,11 @@ window.TerrainManager = class TerrainManager {
     }
 
     _getBlockColor01(id) {
-        // Utilise la palette complète du renderer (ASSET_BLOCK_COLORS + fallback varié)
-        // au lieu de BloxdIO.getBlockColor dont la palette est incomplète (tan uniforme).
+        // Palette fidèle BlockColors (eau=bleu, herbe, sable…) — identique au Terrain Editor.
+        if (window.BlockColors && typeof window.BlockColors.getBlockColor === 'function') {
+            const c = window.BlockColors.getBlockColor(id);
+            return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
+        }
         if (typeof window.assetGetBlockColor === 'function') return window.assetGetBlockColor(id);
         const c = 0x8a8a8a;
         return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
