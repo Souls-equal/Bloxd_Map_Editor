@@ -36,7 +36,7 @@ window.Exporter = class Exporter {
 
         for (const inst of this.assetManager.instances) {
             const template = this.assetManager.templates[inst.name];
-            const schem = template?.schemData;
+            const schem = this.assetManager.getTemplateSchem(inst.name) || (template && template.schemData);
             if (!schem?.blocks) continue;
 
             const posX = Math.round(inst.position.x);
