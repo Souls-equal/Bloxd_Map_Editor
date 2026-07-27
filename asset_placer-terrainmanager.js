@@ -292,7 +292,10 @@ window.TerrainManager = class TerrainManager {
     }
 
     _getBlockColor01(id) {
-        const c = (window.BloxdIO && window.BloxdIO.getBlockColor) ? window.BloxdIO.getBlockColor(id) : 0x8a8a8a;
+        // Utilise la palette complète du renderer (ASSET_BLOCK_COLORS + fallback varié)
+        // au lieu de BloxdIO.getBlockColor dont la palette est incomplète (tan uniforme).
+        if (typeof window.assetGetBlockColor === 'function') return window.assetGetBlockColor(id);
+        const c = 0x8a8a8a;
         return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
     }
 
@@ -376,39 +379,78 @@ window.TerrainManager = class TerrainManager {
         return this.terrainData;
     }
 
-    // Surface : 1 quad (haut) par colonne. Tableaux typés pré-dimensionnés → mémoire bornée.
+    // Surface du terrain : DESSUS + FACES LATÉRALES (jupes vers voisins plus bas / bords).
+    // 2 passes (compte puis remplissage) + tableaux typés pré-dimensionnés → mémoire bornée.
     _renderHeightmapSurface(cols, minX, minY, minZ, fileName) {
         const n = cols.size;
         if (!n) return null;
-        const positions = new Float32Array(n * 12);
-        const indices = n * 6 > 65535 ? new Uint32Array(n * 6) : new Uint16Array(n * 6);
-        const normals = new Float32Array(n * 12);
-        const colors = new Float32Array(n * 16);
-        const fp = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5];
-        const fi = [0, 2, 1, 0, 3, 2];
-        let pi = 0, ii = 0, ni = 0, ci = 0, vi = 0;
+        const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        const keyOf = (x, z) => x + ',' + z;
+        // Passe 1 : compte les faces de côté.
+        let sideCount = 0, borderCount = 0;
         for (const [key, c] of cols) {
-            const p = key.split(',');
-            const lx = (+p[0]) - minX, lz = (+p[1]) - minZ, ly = c.y - minY;
-            const col = this._getBlockColor01(c.id);
-            for (let v = 0; v < 4; v++) {
-                positions[pi++] = fp[v * 3] + lx + 0.5;
-                positions[pi++] = fp[v * 3 + 1] + ly + 1;
-                positions[pi++] = fp[v * 3 + 2] + lz + 0.5;
-                normals[ni++] = 0; normals[ni++] = 1; normals[ni++] = 0;
-                colors[ci++] = col.r; colors[ci++] = col.g; colors[ci++] = col.b; colors[ci++] = 1;
+            const p = key.split(','); const x = +p[0], z = +p[1];
+            for (const [dx, dz] of N4) {
+                const nc = cols.get(keyOf(x + dx, z + dz));
+                if (!nc) borderCount++;
+                else if (nc.y < c.y) sideCount++;
             }
-            for (let i = 0; i < 6; i++) indices[ii++] = fi[i] + vi;
-            vi += 4;
+        }
+        // Cap anti-OOM : si trop de géométrie, on ne garde que le dessus + les jupes de bord.
+        const LIMIT = 2500000;
+        const borderOnly = (n + sideCount + borderCount) > LIMIT;
+        const total = n + (borderOnly ? borderCount : (sideCount + borderCount));
+
+        const positions = new Float32Array(total * 12);
+        const indices = total * 6 > 65535 ? new Uint32Array(total * 6) : new Uint16Array(total * 6);
+        const normals = new Float32Array(total * 12);
+        const colors = new Float32Array(total * 16);
+        const s = { pi: 0, ii: 0, ni: 0, ci: 0, vi: 0 };
+        const setV = (x, y, z, nx, ny, nz, col) => {
+            positions[s.pi++] = x; positions[s.pi++] = y; positions[s.pi++] = z;
+            normals[s.ni++] = nx; normals[s.ni++] = ny; normals[s.ni++] = nz;
+            colors[s.ci++] = col.r; colors[s.ci++] = col.g; colors[s.ci++] = col.b; colors[s.ci++] = 1;
+        };
+        const quad = (a, b, c, d, nn, col) => {
+            setV(a[0], a[1], a[2], nn[0], nn[1], nn[2], col);
+            setV(b[0], b[1], b[2], nn[0], nn[1], nn[2], col);
+            setV(c[0], c[1], c[2], nn[0], nn[1], nn[2], col);
+            setV(d[0], d[1], d[2], nn[0], nn[1], nn[2], col);
+            indices[s.ii++] = s.vi; indices[s.ii++] = s.vi + 2; indices[s.ii++] = s.vi + 1;
+            indices[s.ii++] = s.vi; indices[s.ii++] = s.vi + 3; indices[s.ii++] = s.vi + 2;
+            s.vi += 4;
+        };
+        for (const [key, c] of cols) {
+            const p = key.split(','); const x = +p[0], z = +p[1];
+            const lx = x - minX, lz = z - minZ, topY = (c.y - minY) + 1;
+            const col = this._getBlockColor01(c.id);
+            // Dessus
+            quad([lx - 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz - 0.5],
+                 [lx + 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz + 0.5], [0, 1, 0], col);
+            // Côtés : vers voisin plus bas, ou bord → jupe jusqu'à la base (0).
+            for (const [dx, dz] of N4) {
+                const nc = cols.get(keyOf(x + dx, z + dz));
+                const isBorder = !nc;
+                if (borderOnly && !isBorder) continue;
+                if (!isBorder && nc.y >= c.y) continue;     // voisin plus haut : c'est lui qui émet sa jupe
+                const bottomY = isBorder ? 0 : (nc.y - minY) + 1;
+                if (dx === 1)       quad([lx + 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz + 0.5], [lx + 0.5, bottomY, lz + 0.5], [lx + 0.5, bottomY, lz - 0.5], [1, 0, 0], col);
+                else if (dx === -1) quad([lx - 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz - 0.5], [lx - 0.5, bottomY, lz - 0.5], [lx - 0.5, bottomY, lz + 0.5], [-1, 0, 0], col);
+                else if (dz === 1)  quad([lx + 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz + 0.5], [lx - 0.5, bottomY, lz + 0.5], [lx + 0.5, bottomY, lz + 0.5], [0, 0, 1], col);
+                else                quad([lx - 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz - 0.5], [lx + 0.5, bottomY, lz - 0.5], [lx - 0.5, bottomY, lz - 0.5], [0, 0, -1], col);
+            }
         }
         const vd = new BABYLON.VertexData();
-        vd.positions = positions; vd.indices = indices; vd.normals = normals; vd.colors = colors;
+        vd.positions = positions.subarray(0, s.pi);
+        vd.indices = indices.subarray(0, s.ii);
+        vd.normals = normals.subarray(0, s.ni);
+        vd.colors = colors.subarray(0, s.ci);
         const mesh = new BABYLON.Mesh(fileName || 'terrain', this.scene);
         vd.applyToMesh(mesh);
         const mat = new BABYLON.StandardMaterial('terrainSurfaceMat', this.scene);
         mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         mat.useVertexColors = true;
-        mat.backFaceCulling = false;   // surface visible depuis le dessus (fix "invisible d'en haut")
+        mat.backFaceCulling = false;   // visible des deux côtés
         mesh.material = mat;
         mesh.isPickable = true;
         mesh.metadata = { isTerrain: true };
