@@ -165,7 +165,7 @@ window.LibraryUI = class LibraryUI {
     }
     _collectAllCategories() {
         const set = new Set();
-        for (const name in this.assetManager.templates) {
+        for (const name in this.assetManager.templateSchem) {
             const c = this._getAssetCategory(name);
             if (c) set.add(c);
         }
@@ -217,7 +217,7 @@ window.LibraryUI = class LibraryUI {
         this._renderTagFilters();
         const grid = document.getElementById('asset-grid-sidebar');
         if (!grid) return;
-        const names = Object.keys(this.assetManager.templates).sort();
+        const names = Object.keys(this.assetManager.templateSchem).sort();
         const filtered = names.filter(n => this._assetMatchesFilters(n));
         grid.innerHTML = '';
 
@@ -240,8 +240,7 @@ window.LibraryUI = class LibraryUI {
                     `<div class="asset-size">${bc} · ${sz.x}×${sz.y}×${sz.z}</div>`;
                 card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
                 card.addEventListener('click', () => {
-                    const sourceMesh = this.assetManager.templates[name];
-                    const schemData = sourceMesh.schemData || { size: { x: 4, y: 4, z: 4 }, blocks: [] };
+                    const schemData = this.assetManager.getTemplateSchem(name) || { size: { x: 4, y: 4, z: 4 }, blocks: [] };
                     this.dragDropManager.startPlacement(name, schemData);
                 });
                 grid.appendChild(card);
