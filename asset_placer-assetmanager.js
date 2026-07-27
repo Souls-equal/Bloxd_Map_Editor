@@ -1,13 +1,18 @@
 /**
  * asset_placer-assetmanager.js
  * Asset manager (Babylon)
+ *
+ * Chargement LAZY : à l'inscription on stocke uniquement le schem + les métadonnées
+ * (pas de mesh). Le mesh source n'est créé (et caché) qu'au 1er placement.
+ * → permet de charger des centaines d'assets sans exploser la mémoire GPU.
  */
 
 window.AssetManager = class AssetManager {
     constructor(scene) {
         this.scene = scene;
-        this.templates = {};
-        this.templateMeta = {};
+        this.templates = {};        // name -> sourceMesh (null tant que non créé à la demande)
+        this.templateMeta = {};     // name -> metadata (catégorie, taille…)
+        this.templateSchem = {};    // name -> schem (blocks[], size, totalBlocks)
         this.instances = [];
         this._nextId = 1;
         this.onChanged = null;
@@ -18,28 +23,57 @@ window.AssetManager = class AssetManager {
     }
 
     registerTemplate(name, sourceMesh, schemData = null, metadata = {}) {
-        this.templates[name] = sourceMesh;
         this.templateMeta[name] = metadata || {};
-        if (schemData) sourceMesh.schemData = schemData;
+        if (schemData) this.templateSchem[name] = schemData;
+        this.templates[name] = sourceMesh || null;  // null = mesh créé à la demande (lazy)
 
-        sourceMesh.name = `template_${name}`;
-        sourceMesh.id = `template_${name}`;
-        sourceMesh.isVisible = false;
-        sourceMesh.visibility = 0;
-        sourceMesh.isPickable = false;
-        sourceMesh.metadata = Object.assign({}, sourceMesh.metadata, {
-            isAssetTemplate: true,
-            assetName: name,
-            assetLibraryMeta: metadata || {}
-        });
+        if (sourceMesh) {
+            if (schemData) sourceMesh.schemData = schemData;
+            sourceMesh.name = `template_${name}`;
+            sourceMesh.id = `template_${name}`;
+            sourceMesh.isVisible = false;
+            sourceMesh.visibility = 0;
+            sourceMesh.isPickable = false;
+            sourceMesh.metadata = Object.assign({}, sourceMesh.metadata, {
+                isAssetTemplate: true,
+                assetName: name,
+                assetLibraryMeta: metadata || {}
+            });
+        }
     }
 
     getTemplateMeta(name) {
         return this.templateMeta[name] || {};
     }
 
+    getTemplateSchem(name) {
+        return this.templateSchem[name] || (this.templates[name] && this.templates[name].schemData) || null;
+    }
+
+    hasTemplate(name) {
+        return Object.prototype.hasOwnProperty.call(this.templateSchem, name) || (this.templates[name] != null);
+    }
+
+    // Crée (et met en cache) le mesh source au 1er usage.
+    _ensureSourceMesh(name) {
+        if (this.templates[name]) return this.templates[name];
+        const schem = this.templateSchem[name];
+        if (!schem || !window.createMeshFromSchem) return null;
+        const mesh = window.createMeshFromSchem(this.scene, schem);
+        if (!mesh) return null;
+        mesh.schemData = schem;
+        mesh.name = `template_${name}`;
+        mesh.id = `template_${name}`;
+        mesh.isVisible = false;
+        mesh.visibility = 0;
+        mesh.isPickable = false;
+        mesh.metadata = { isAssetTemplate: true, assetName: name, assetLibraryMeta: this.templateMeta[name] || {} };
+        this.templates[name] = mesh;
+        return mesh;
+    }
+
     addInstance(name, position = new BABYLON.Vector3(0, 0, 0), rotationY = 0) {
-        const sourceMesh = this.templates[name];
+        const sourceMesh = this._ensureSourceMesh(name);  // création lazy au 1er placement
         if (!sourceMesh) {
             console.error(`Template not found: ${name}`);
             return null;
