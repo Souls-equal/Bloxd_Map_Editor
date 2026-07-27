@@ -64,11 +64,10 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
                 if (!schem || !schem.blocks || !schem.blocks.length) throw new Error('empty');
 
                 const uniqueName = this._makeUniqueTemplateName(name);
-                const sourceMesh = window.createMeshFromSchem(this.scene, schem);
-                if (!sourceMesh) throw new Error('mesh failed');
-
+                // Chargement LAZY : on stocke le schem + métadonnées SANS créer le mesh
+                // (le mesh est créé au 1er placement via AssetManager._ensureSourceMesh).
                 const meta = this._normalizeMetadata({ type, file: fileName }, fileName, schem);
-                this.assetManager.registerTemplate(uniqueName, sourceMesh, schem, meta);
+                this.assetManager.registerTemplate(uniqueName, null, schem, meta);
                 loaded++;
                 loadedNums.push(n);
                 consecutiveMisses = 0;
@@ -151,11 +150,8 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
 
             const baseName = entry.name || this._nameFromPath(fileName);
             const uniqueName = this._makeUniqueTemplateName(baseName);
-            const sourceMesh = window.createMeshFromSchem(this.scene, schem);
-            if (!sourceMesh) return 0;
-
             const meta = this._normalizeMetadata(entry, fileName, schem);
-            this.assetManager.registerTemplate(uniqueName, sourceMesh, schem, meta);
+            this.assetManager.registerTemplate(uniqueName, null, schem, meta);
             if (this.libraryUI) this.libraryUI.populateLibrary();
             return 1;
         } catch (err) {
@@ -213,7 +209,27 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         return window.parseSchem(new TextDecoder().decode(buffer));
     }
 
-    _convertBloxdSchemToBlockList(parsed) { return parsed; }
+    // Convertit le format BloxdIO (Map<chunkKey, Int32Array>) en liste de blocs
+    // [{x,y,z,id}, ...] attendue par createMeshFromSchem / l'export. No-op si déjà une liste.
+    _convertBloxdSchemToBlockList(parsed) {
+        if (!parsed || !parsed.blocks) return parsed;
+        if (Array.isArray(parsed.blocks)) return parsed;             // déjà liste (JSON)
+        if (typeof parsed.blocks.forEach !== 'function') return parsed;
+        const CHUNK = 32;
+        const out = [];
+        parsed.blocks.forEach((arr, key) => {
+            if (!arr) return;
+            const p = key.split(',');
+            const bX = (+p[0]) * CHUNK, bY = (+p[1]) * CHUNK, bZ = (+p[2]) * CHUNK;
+            for (let lx = 0; lx < CHUNK; lx++)
+                for (let ly = 0; ly < CHUNK; ly++)
+                    for (let lz = 0; lz < CHUNK; lz++) {
+                        const id = arr[lx * 1024 + ly * 32 + lz];
+                        if (id !== 0) out.push({ x: bX + lx, y: bY + ly, z: bZ + lz, id });
+                    }
+        });
+        return Object.assign({}, parsed, { blocks: out });
+    }
 
     _nameFromPath(path) {
         return path.split('/').pop().replace(/\.(bloxdschem|json|schem)$/i, '').replace(/[_-]+/g, ' ').trim() || 'Schematic';
@@ -221,7 +237,7 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
 
     _makeUniqueTemplateName(baseName) {
         let name = baseName, i = 2;
-        while (this.assetManager.templates[name]) name = `${baseName} ${i++}`;
+        while (this.assetManager.hasTemplate(name)) name = `${baseName} ${i++}`;
         return name;
     }
 
