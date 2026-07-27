@@ -334,6 +334,7 @@ window.TerrainManager = class TerrainManager {
         const mat = new BABYLON.StandardMaterial('terrainMat', this.scene);
         mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         mat.useVertexColors = true;
+        mat.backFaceCulling = false;   // surface visible depuis le dessus
         mesh.material = mat;
         mesh.isPickable = true;
         mesh.metadata = { isTerrain: true };
@@ -355,13 +356,16 @@ window.TerrainManager = class TerrainManager {
         const cols = hm.cols, b = hm.bounds;
         const minX = isFinite(b.minX) ? b.minX : 0;
         const minZ = isFinite(b.minZ) ? b.minZ : 0;
-        let minY = Infinity; for (const v of cols.values()) if (v.y < minY) minY = v.y;
+        let minY = Infinity, maxY = -Infinity;
+        for (const v of cols.values()) { if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y; }
         if (!isFinite(minY)) minY = 0;
+        if (!isFinite(maxY)) maxY = minY;
         const sx = Math.max(1, (isFinite(b.maxX) ? b.maxX : 0) - minX + 1);
         const sz = Math.max(1, (isFinite(b.maxZ) ? b.maxZ : 0) - minZ + 1);
+        const sy = Math.max(1, maxY - minY + 1);
         this.heightSurface = cols;                 // Map<"x,z" raw, {y,id}> pour l'export
         this.heightOrigin = { x: minX, y: minY, z: minZ };
-        this.terrainData = { name: fileName, mode: 'heightmap', size: { x: sx, y: 1, z: sz }, totalColumns: cols.size };
+        this.terrainData = { name: fileName, mode: 'heightmap', size: { x: sx, y: sy, z: sz }, totalColumns: cols.size };
         this.terrainBlocks = [];
         this.terrainPosition.set(-Math.floor(sx / 2), 0, -Math.floor(sz / 2));
         const mesh = this._renderHeightmapSurface(cols, minX, minY, minZ, fileName);
@@ -404,6 +408,7 @@ window.TerrainManager = class TerrainManager {
         const mat = new BABYLON.StandardMaterial('terrainSurfaceMat', this.scene);
         mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
         mat.useVertexColors = true;
+        mat.backFaceCulling = false;   // surface visible depuis le dessus (fix "invisible d'en haut")
         mesh.material = mat;
         mesh.isPickable = true;
         mesh.metadata = { isTerrain: true };
