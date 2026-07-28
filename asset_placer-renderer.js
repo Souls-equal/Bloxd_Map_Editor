@@ -48,6 +48,23 @@ function getBlockColor(id) {
 }
 window.assetGetBlockColor = getBlockColor;
 
+// Recentre la géométrie d'un mesh horizontalement (XZ) pour que la rotation se fasse
+// autour du CENTRE du schem, pas d'un coin. Retourne l'offset appliqué {x, z}.
+window.recenterMeshHorizontal = function (mesh) {
+    try {
+        if (typeof mesh.makeGeometryUnique === 'function') mesh.makeGeometryUnique();
+        mesh.computeWorldMatrix(true);
+        const bb = mesh.getBoundingInfo().boundingBox;
+        const cx = (bb.minimum.x + bb.maximum.x) / 2;
+        const cz = (bb.minimum.z + bb.maximum.z) / 2;
+        mesh.position.x = -cx;
+        mesh.position.z = -cz;
+        if (typeof mesh.bakeCurrentTransformIntoVertices === 'function') mesh.bakeCurrentTransformIntoVertices();
+        mesh.refreshBoundingInfo(true);
+        return { x: cx, z: cz };
+    } catch (e) { return { x: 0, z: 0 }; }
+};
+
 window.createMeshFromSchem = function(scene, schem) {
     const blocks = schem.blocks;
     if (!blocks || blocks.length === 0) return null;
