@@ -49,6 +49,8 @@ window.DragDropManager = class DragDropManager {
             ghost = sourceMesh.clone("ghost_mesh");
         }
         if (!ghost) return null;
+        // Même recentrage que les instances → l'aperçu correspond au placement centré.
+        if (window.recenterMeshHorizontal) window.recenterMeshHorizontal(ghost);
 
         ghost.setEnabled(true);
         ghost.isVisible = true;
