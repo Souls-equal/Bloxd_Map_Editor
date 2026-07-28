@@ -55,16 +55,31 @@ window.Exporter = class Exporter {
                     if (prev === undefined || wy < prev) footprint.set(k, wy);
                 }
             }
-            // Auto-terraform : remplit du terrain (matériau du sol) sous chaque colonne du schem.
+            // Auto-terraform : socle NATUREL — pente au bord (3 anneaux) + matériau du sol par colonne.
             if (footprint) {
                 const tm = this.terrainManager;
-                for (const [k, baseY] of footprint) {
-                    const p = k.split(','); const wx = +p[0], wz = +p[1];
+                let baseY = Infinity; for (const y of footprint.values()) if (y < baseY) baseY = y;
+                const floorY = baseY - 6;
+                const filled = new Set();
+                const fillCol = (wx, wz, topY) => {
                     let gid = (tm && tm.getSurfaceBlockAtWorld) ? tm.getSurfaceBlockAtWorld(wx, wz) : null;
-                    if (!gid) gid = 2; // dirt
-                    for (let y = baseY - 1; y >= baseY - 5; y--) {
-                        putBlock({ x: wx, y, z: wz, id: gid, data: 0 }, 'asset', inst);
+                    if (!gid) gid = 2;
+                    for (let y = Math.round(topY); y >= Math.round(floorY); y--) putBlock({ x: wx, y, z: wz, id: gid, data: 0 }, 'asset', inst);
+                };
+                for (const [k, by] of footprint) { const p = k.split(','); fillCol(+p[0], +p[1], by - 1); filled.add(k); }
+                // anneaux de bordure en pente (1 bloc de moins par anneau)
+                let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
+                for (let ring = 1; ring <= 3; ring++) {
+                    const next = [];
+                    for (const [x, z] of frontier) {
+                        for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                            const nk = (x+dx) + ',' + (z+dz);
+                            if (filled.has(nk)) continue; filled.add(nk);
+                            fillCol(x+dx, z+dz, baseY - 1 - ring);
+                            next.push([x+dx, z+dz]);
+                        }
                     }
+                    frontier = next;
                 }
             }
         }
