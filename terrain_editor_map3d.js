@@ -631,11 +631,13 @@ class Map3D {
      */
     getCellColor(cell, grid, gx, gz, out) {
         out = out || { r: 0, g: 0, b: 0 };
+        const sea = (this.generator && this.generator.config) ? this.generator.config.seaLevel : -Infinity;
         const biomeObj = (this.generator && this.generator.biomes && this.generator.biomes[cell.biome]) || null;
         const base = this._biomeRGB(biomeObj ? biomeObj.color : '#4ade80');
         out.r = base.r; out.g = base.g; out.b = base.b;
 
-        if (grid && gx !== undefined && gz !== undefined) {
+        // Pas de mélange de biomes sous l'eau → sable pur (pas de vert qui bave).
+        if (cell.height > sea && grid && gx !== undefined && gz !== undefined) {
             const resX = grid.length, resZ = grid[0] ? grid[0].length : 0;
             let hasDiff = false;
             for (let dx = -1; dx <= 1 && !hasDiff; dx++) {
