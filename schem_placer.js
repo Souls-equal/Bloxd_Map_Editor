@@ -219,13 +219,31 @@ const MODE_HINTS = {
         move: 'Drag the <b>colored arrows</b> to move along an axis, or <kbd>↑↓←→</kbd> (plan) + <kbd>R</kbd>/<kbd>C</kbd> (height).',
         scale: 'Click <b>orange spheres</b> to adjust cut zone.',
         multi: 'Click schems to <b>add to selection</b>.'
+    },
+    ja: {
+        select: 'クリックで<b>選択</b>. ドラッグで<b>移動</b>. Ctrlで<b>複製</b>.',
+        move: '<b>矢印</b>をドラッグ、または <kbd>↑↓←→</kbd> + <kbd>R</kbd>/<kbd>C</kbd>.',
+        scale: '<b>X/Y/Z</b> で面選択, <b>←→↑↓</b> で調整. 切断/複製.',
+        multi: 'クリックで<b>選択に追加</b>.'
+    },
+    ko: {
+        select: '클릭으로 <b>선택</b>. 드래그로 <b>이동</b>. Ctrl로 <b>복제</b>.',
+        move: '<b>화살표</b> 드래그, 또는 <kbd>↑↓←→</kbd> + <kbd>R</kbd>/<kbd>C</kbd>.',
+        scale: '<b>X/Y/Z</b> 면 선택, <b>←→↑↓</b> 조정. 잘라내기/복제.',
+        multi: '클릭으로 <b>선택 추가</b>.'
+    },
+    th: {
+        select: 'คลิกเพื่อ<b>เลือก</b>. ลากเพื่อ<b>ย้าย</b>. Ctrl เพื่อ<b>ทำซ้ำ</b>.',
+        move: 'ลาก<b>ลูกศร</b> หรือ <kbd>↑↓←→</kbd> + <kbd>R</kbd>/<kbd>C</kbd>.',
+        scale: '<b>X/Y/Z</b> เลือก, <b>←→↑↓</b> ปรับ. ตัด/ทำซ้ำ.',
+        multi: 'คลิกเพื่อ<b>เพิ่มเข้าเลือก</b>.'
     }
 };
 
 function setModeHint() {
     const el = document.getElementById('mode-indicator');
     if (!el) return;
-    const hints = MODE_HINTS[state.lang] || MODE_HINTS['fr'];
+    const hints = MODE_HINTS[state.lang] || MODE_HINTS['en'];
     const modeIcons = { select: '🖱️', move: '↔️', scale: '✂️', multi: '🔲' };
     el.innerHTML = `<b>${modeIcons[state.mode]} ${state.mode.toUpperCase()}</b> — ` + (hints[state.mode] || '');
 }
