@@ -16,6 +16,8 @@ window.AssetInstance = class AssetInstance {
         this.locked = false;
         this.priorityOverTerrain = true;
         this.priorityOverAssets = true;
+        this.autoTerraform = false;
+        this._foundationMesh = null;
 
         this.mesh = this._createRenderableMesh(sourceMesh, `asset_clone_${id}`);
         // Recentre la géométrie → la rotation se fait autour du CENTRE du schem.
@@ -62,6 +64,43 @@ window.AssetInstance = class AssetInstance {
     setPosition(x, y, z) { this._position.set(x, y, z); this.mesh.position.copyFrom(this._position); }
     setRotation(deg) { this.rotationY = deg; }
 
+    // === Auto-terraform : ajoute un socle de terrain sous le schem (matériau du sol). ===
+    _getGroundBlockId() {
+        const tm = window.appTerrainManager;
+        if (tm && typeof tm.getSurfaceBlockAtWorld === 'function') {
+            const id = tm.getSurfaceBlockAtWorld(Math.round(this._position.x), Math.round(this._position.z));
+            if (id) return id;
+        }
+        return 2; // dirt par défaut
+    }
+    setAutoTerraform(on) {
+        this.autoTerraform = on;
+        if (on && !this._foundationMesh) {
+            this._foundationMesh = this._createFoundationMesh();
+        } else if (!on && this._foundationMesh) {
+            this._foundationMesh.dispose(); this._foundationMesh = null;
+        }
+    }
+    _createFoundationMesh() {
+        const schem = this.sourceMesh && this.sourceMesh.schemData;
+        const sx = (schem && schem.size && schem.size.x) || 4;
+        const sz = (schem && schem.size && schem.size.z) || 4;
+        const depth = 5;
+        const box = BABYLON.MeshBuilder.CreateBox('foundation_' + this.id, { size: 1 }, this.scene);
+        box.scaling.set(sx, depth, sz);
+        box.position.set(0, -depth / 2, 0);
+        box.parent = this.mesh;          // hérite position + rotation de l'asset
+        box.isPickable = false;
+        const gid = this._getGroundBlockId();
+        const c = (window.BlockColors && window.BlockColors.getBlockColor(gid)) || 0x6e4b2a;
+        const mat = new BABYLON.StandardMaterial('foundationMat_' + this.id, this.scene);
+        mat.diffuseColor = new BABYLON.Color3(((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255);
+        mat.specularColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+        box.material = mat;
+        box.metadata = { isFoundation: true };
+        return box;
+    }
+
     updateTransform() {
         this.mesh.position.copyFrom(this._position);
         this.mesh.rotation.y = BABYLON.Tools.ToRadians(this._rotationY);
@@ -69,6 +108,7 @@ window.AssetInstance = class AssetInstance {
     }
 
     dispose() {
+        if (this._foundationMesh) { this._foundationMesh.dispose(); this._foundationMesh = null; }
         if (this.mesh) { this.mesh.dispose(); this.mesh = null; }
     }
 };
