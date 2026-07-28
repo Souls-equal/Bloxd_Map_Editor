@@ -85,13 +85,18 @@ window.UIManager = class UIManager {
         const isTerrain = !!instance.isTerrainSelection;
         document.getElementById('prop-locked').checked = isTerrain || instance.locked;
         document.getElementById('prop-locked').disabled = isTerrain;
+        document.getElementById('prop-priority-terrain').checked = !!instance.priorityOverTerrain;
+        document.getElementById('prop-priority-assets').checked = !!instance.priorityOverAssets;
         document.getElementById('btn-duplicate').disabled = isTerrain;
         document.getElementById('btn-delete').disabled = isTerrain || instance.locked;
     }
 
     _bindSidebarEvents() {
-        // Simplified bindings
         const inst = () => this.selectionManager.selectedInstance;
+        const refresh = (i) => {
+            if (this.selectionManager.gizmoManager && i && i.mesh) this.selectionManager.gizmoManager.attachToMesh(i.mesh);
+            if (this.selectionManager.onSelectionChanged) this.selectionManager.onSelectionChanged(i);
+        };
         document.getElementById('btn-delete').addEventListener('click', () => {
             const i = inst();
             if (i && !i.isTerrainSelection && !i.locked) {
@@ -106,6 +111,39 @@ window.UIManager = class UIManager {
                 const ni = this.assetManager.addInstance(i.name, np, i.rotationY);
                 if (ni) this.selectionManager.selectInstance(ni);
             }
+        });
+
+        // Position X/Y/Z
+        const onPos = () => {
+            const i = inst(); if (!i || i.isTerrainSelection || i.locked) return;
+            const x = Math.round(parseFloat(document.getElementById('prop-x').value) || 0);
+            const y = Math.round(parseFloat(document.getElementById('prop-y').value) || 0);
+            const z = Math.round(parseFloat(document.getElementById('prop-z').value) || 0);
+            i.setPosition(x, y, z);
+            refresh(i);
+        };
+        ['prop-x', 'prop-y', 'prop-z'].forEach(id => document.getElementById(id).addEventListener('input', onPos));
+
+        // Rotation (select 0/90/180/270)
+        document.getElementById('prop-rot').addEventListener('change', () => {
+            const i = inst(); if (!i || i.isTerrainSelection || i.locked) return;
+            const deg = parseInt(document.getElementById('prop-rot').value, 10) || 0;
+            i.setRotation(deg);
+            refresh(i);
+        });
+
+        // Locked
+        document.getElementById('prop-locked').addEventListener('change', () => {
+            const i = inst(); if (!i || i.isTerrainSelection) return;
+            i.locked = document.getElementById('prop-locked').checked;
+            this.selectionManager.selectInstance(i, true);
+        });
+        // Priorités
+        document.getElementById('prop-priority-terrain').addEventListener('change', () => {
+            const i = inst(); if (i) i.priorityOverTerrain = document.getElementById('prop-priority-terrain').checked;
+        });
+        document.getElementById('prop-priority-assets').addEventListener('change', () => {
+            const i = inst(); if (i) i.priorityOverAssets = document.getElementById('prop-priority-assets').checked;
         });
     }
 };
