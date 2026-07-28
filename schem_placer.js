@@ -123,16 +123,58 @@ const i18nMap = {
             '<b>Multi</b> (M): add schems to the selection. <b>Union</b> merges them, <b>Split</b> undoes',
             '<kbd>Del</kbd>: delete · <kbd>F</kbd>: recenter · <kbd>H</kbd>: help · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: cancel',
         ],
+    },
+    ja: {
+        ready:'準備完了.',locked_msg:'ロック中.',no_sel:'選択なし.',no_union:'2つ以上選択して結合.',no_split:'結合なし.',no_export_sel:'エクスポート対象なし.',export_fail:'エクスポート対象なし.',export_done:'エクスポート: {0} ({1} schem).',export_parts:'{0} パート.',union_done:'"{0}" に結合.',split_done:'分離完了. 残り {0}.',schem_loaded:'{0} schem ロード.',del_fail:'{0} ファイル認識不可.',clear_done:'シーンクリア.',loaded_saved:'プリセット: {0} schem.',preset_saved:'"{0}" 保存.',preset_empty:'プリセットなし.',delete:'削除',save_prompt:'プリセット名:',confirm_clear:'シーンをクリア?',snap:'移動 — クリックで確定',drag_dupe:'複製: ',cut_done:'切断完了.',copy_done:'コピー完了.',
+        open:'開く',export:'エクスポート',mode_select:'マウス',mode_move:'移動',mode_scale:'分離',mode_multi:'マルチ',clear:'クリア',
+        dim:'寸法',pos:'位置',blocks:'ブロック',color:'色',step:'ステップ:',blocks_unit:'ブロック',shift_hint:'Shiftで×10',rename:'リネーム',
+        schems:'Schems',no_schem:'Schemなし. ドラッグまたは',open_hint:'開くをクリック',
+        cut_title:'✂️ 分離',cut_extract:'✂️ 切断',cut_copy:'📑 複製',
+        multi_title:'🔲 マルチ選択 —',schems_word:'schem',multi_union:'🔗 結合',multi_split:'✂️ 分離',multi_export:'💾 エクスポート',
+        drop_msg:'📥 .bloxdschemまたは.zipをドロップ',
+        export_title:'💾 エクスポート',export_base:'ベース名',export_folder:'ZIPフォルダ名',export_coords:'座標 _x…_z… を追加',export_single:'単一ファイル',cancel:'キャンセル',download:'📦 ダウンロード',
+        me_title:'💾 選択をエクスポート',me_single:'📄 1ファイル',me_single_sub:'全schemを1つの.bloxdschemに結合',me_separate:'📑 個別(schem毎)',me_separate_sub:'各schemを.zipに個別ダウンロード',me_autosplit:'✂️ 結合+自動分割',me_autosplit_sub:'結合後>160 chunks ならZIP分割',
+        cam_label:'カメラ:',step_label:'ステップ:',help_title:'クイックガイド',help_start:'開始',
+        prompt_export_name:'エクスポート名:',prompt_new_name:'新しい名前:',
+        help_items:['<b>左クリック+ドラッグ</b>: カメラ回転','<b>ホイール</b>: ズーム','<b>右クリック+ドラッグ</b>: パン','<b>WASD/ZQSD</b>: 飛行 — <b>Space/Ctrl</b>: 上昇/下降','<b>ドラッグ&ドロップ</b>: .bloxdschem読込','<b>マウスモード</b> (V): クリック=選択 · ドラッグ=移動 · Ctrl+ドラッグ=複製','<b>移動モード</b> (G): 矢印ドラッグ or WASD(地上) R/C(上下)','<b>分離モード</b> (T): X/Y/Z で面選択 · 矢印で調整 · 切断/複製','🔒ボタン / <kbd>L</kbd>: ロック','<b>マルチ</b> (M): 選択追加 · 結合/分離','<kbd>Del</kbd>: 削除 · <kbd>F</kbd>: 中央 · <kbd>H</kbd>: ヘルプ · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: キャンセル'],
+    },
+    ko: {
+        ready:'준비됨.',locked_msg:'잠겨 있음.',no_sel:'선택 없음.',no_union:'2개 이상 선택하여 병합.',no_split:'병합 없음.',no_export_sel:'내보낼 스케맨 없음.',export_fail:'내보낼 스케맨 없음.',export_done:'내보냄: {0} ({1}개).',export_parts:'{0}개 파트.',union_done:'"{0}"로 병합.',split_done:'분할 완료. {0}개 남음.',schem_loaded:'{0}개 로드.',del_fail:'{0}개 파일 인식 불가.',clear_done:'씬 비움.',loaded_saved:'프리셋: {0}개.',preset_saved:'"{0}" 저장.',preset_empty:'프리셋 없음.',delete:'삭제',save_prompt:'프리셋 이름:',confirm_clear:'씬을 비우시겠습니까?',snap:'이동 — 클릭하여 확정',drag_dupe:'복제: ',cut_done:'잘라내기 완료.',copy_done:'복사 완료.',
+        open:'열기',export:'내보내기',mode_select:'마우스',mode_move:'이동',mode_scale:'분할',mode_multi:'멀티',clear:'비우기',
+        dim:'크기',pos:'위치',blocks:'블록',color:'색상',step:'단계:',blocks_unit:'블록',shift_hint:'Shift로 ×10',rename:'이름 변경',
+        schems:'스케맨',no_schem:'스케맨 없음. 드래그하거나',open_hint:'열기 클릭',
+        cut_title:'✂️ 분할',cut_extract:'✂️ 잘라내기',cut_copy:'📑 복제',
+        multi_title:'🔲 다중 선택 —',schems_word:'스케맨',multi_union:'🔗 병합',multi_split:'✂️ 분할',multi_export:'💾 내보내기',
+        drop_msg:'📥 .bloxdschem 또는 .zip 드롭',
+        export_title:'💾 내보내기',export_base:'기본 이름',export_folder:'ZIP 폴더명',export_coords:'좌표 _x…_z… 추가',export_single:'단일 파일',cancel:'취소',download:'📦 다운로드',
+        me_title:'💾 선택 내보내기',me_single:'📄 1개 파일',me_single_sub:'모든 스케맨을 1개로 병합',me_separate:'📑 개별',me_separate_sub:'각 스케맨을 .zip에 개별 다운로드',me_autosplit:'✂️ 병합+자동 분할',me_autosplit_sub:'병합 후 >160 chunks면 ZIP 분할',
+        cam_label:'카메라:',step_label:'단계:',help_title:'빠른 가이드',help_start:'시작',
+        prompt_export_name:'내보내기 이름:',prompt_new_name:'새 이름:',
+        help_items:['<b>좌클릭+드래그</b>: 카메라 회전','<b>휠</b>: 줌','<b>우클릭+드래그</b>: 팬','<b>WASD/ZQSD</b>: 비행 — <b>Space/Ctrl</b>: 상승/하강','<b>드래그&드롭</b>: .bloxdschem 로드','<b>마우스 모드</b> (V): 클릭=선택 · 드래그=이동 · Ctrl+드래그=복제','<b>이동 모드</b> (G): 화살표 드래그 or WASD(지상) R/C(상하)','<b>분할 모드</b> (T): X/Y/Z 면 선택 · 화살표 조정 · 잘라내기/복제','🔒버튼 / <kbd>L</kbd>: 잠금','<b>멀티</b> (M): 선택 추가 · 병합/분할','<kbd>Del</kbd>: 삭제 · <kbd>F</kbd>: 중앙 · <kbd>H</kbd>: 도움말 · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: 취소'],
+    },
+    th: {
+        ready:'พร้อม.',locked_msg:'ล็อคอยู่.',no_sel:'ไม่ได้เลือก.',no_union:'เลือกอย่างน้อย 2 อันเพื่อรวม.',no_split:'ไม่มีการรวม.',no_export_sel:'ไม่ได้เลือกสเคมา.',export_fail:'ไม่มีสเคมาส่งออก.',export_done:'ส่งออก: {0} ({1} อัน).',export_parts:'{0} ส่วน.',union_done:'รวมเป็น "{0}".',split_done:'แยกสำเร็จ. เหลือ {0}.',schem_loaded:'โหลด {0} อัน.',del_fail:'{0} ไฟล์ไม่รู้จัก.',clear_done:'ล้างซีน.',loaded_saved:'โหลดพรีเซ็ต: {0} อัน.',preset_saved:'บันทึก "{0}".',preset_empty:'ไม่มีพรีเซ็ต.',delete:'ลบ',save_prompt:'ชื่อพรีเซ็ต:',confirm_clear:'ล้างซีน?',snap:'เคลื่อนย้าย — คลิกเพื่อยืนยัน',drag_dupe:'สำเนา: ',cut_done:'ตัดสำเร็จ.',copy_done:'คัดลอกสำเร็จ.',
+        open:'เปิด',export:'ส่งออก',mode_select:'เมาส์',mode_move:'ย้าย',mode_scale:'แยก',mode_multi:'หลายตัว',clear:'ล้าง',
+        dim:'ขนาด',pos:'ตำแหน่ง',blocks:'บล็อก',color:'สี',step:'ขั้น:',blocks_unit:'บล็อก',shift_hint:'กด Shift สำหรับ ×10',rename:'เปลี่ยนชื่อ',
+        schems:'สเคมา',no_schem:'ไม่มีสเคมา. ลากหรือ',open_hint:'คลิกเปิด',
+        cut_title:'✂️ แยก',cut_extract:'✂️ ตัด',cut_copy:'📑 ทำซ้ำ',
+        multi_title:'🔲 เลือกหลายตัว —',schems_word:'อัน',multi_union:'🔗 รวม',multi_split:'✂️ แยก',multi_export:'💾 ส่งออก',
+        drop_msg:'📥 วาง .bloxdschem หรือ .zip ที่นี่',
+        export_title:'💾 ส่งออก',export_base:'ชื่อหลัก',export_folder:'ชื่อโฟลเดอร์ ZIP',export_coords:'เพิ่มพิกัด _x…_z…',export_single:'ไฟล์เดียว',cancel:'ยกเลิก',download:'📦 ดาวน์โหลด',
+        me_title:'💾 ส่งออกที่เลือก',me_single:'📄 1 ไฟล์',me_single_sub:'รวมทั้งหมดเป็น 1 ไฟล์',me_separate:'📑 แยก',me_separate_sub:'ดาวน์โหลดแยกใน .zip',me_autosplit:'✂️ รวม+แยกอัตโนมัติ',me_autosplit_sub:'รวมแล้วแยก ZIP ถ้า > 160 chunks',
+        cam_label:'กล้อง:',step_label:'ขั้น:',help_title:'คู่มือด่วน',help_start:'เริ่ม',
+        prompt_export_name:'ชื่อส่งออก:',prompt_new_name:'ชื่อใหม่:',
+        help_items:['<b>คลิกซ้าย+ลาก</b>: หมุนกล้อง','<b>ล้อ</b>: ซูม','<b>คลิกขวา+ลาก</b>: เลื่อน','<b>WASD/ZQSD</b>: บิน — <b>Space/Ctrl</b>: ขึ้น/ลง','<b>ลาก&วาง</b>: โหลด .bloxdschem','<b>โหมดเมาส์</b> (V): คลิก=เลือก · ลาก=ย้าย · Ctrl+ลาก=ทำซ้ำ','<b>โหมดย้าย</b> (G): ลากลูกศร or WASD(พื้น) R/C(บน/ล่าง)','<b>โหมดแยก</b> (T): X/Y/Z เลือก · ปรับ · ตัด/ทำซ้ำ','🔒ปุ่ม / <kbd>L</kbd>: ล็อก','<b>หลายตัว</b> (M): เพิ่ม · รวม/แยก','<kbd>Del</kbd>: ลบ · <kbd>F</kbd>: กึ่งกลาง · <kbd>H</kbd>: ช่วยเหลือ · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: ยกเลิก'],
     }
 };
 
 function i18n(key, ...args) {
-    const txt = (i18nMap[state.lang]?.[key] || i18nMap['fr'][key] || key);
+    const txt = (i18nMap[state.lang]?.[key] || i18nMap['en']?.[key] || key);
     return args.reduce((s, a, i) => s.replace('{'+i+'}', a), txt);
 }
 
 function setLang(lang) {
-    state.lang = (lang === 'en') ? 'en' : 'fr';
+    state.lang = i18nMap[lang] ? lang : 'en';
     localStorage.setItem('bloxdTools.lang', state.lang);
     const btn = document.getElementById('btn-lang');
     if (btn) btn.textContent = state.lang.toUpperCase();
