@@ -18,6 +18,8 @@ window.AssetInstance = class AssetInstance {
         this.priorityOverAssets = true;
 
         this.mesh = this._createRenderableMesh(sourceMesh, `asset_clone_${id}`);
+        // Recentre la géométrie → la rotation se fait autour du CENTRE du schem.
+        this._centerOffset = (window.recenterMeshHorizontal ? window.recenterMeshHorizontal(this.mesh) : { x: 0, z: 0 });
         this.mesh.metadata = Object.assign({}, this.mesh.metadata, {
             isAssetTemplate: false,
             isGhost: false,
