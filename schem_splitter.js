@@ -29,6 +29,33 @@ const T={
         detecting:'Détection...', noUnits:'Aucune unité trouvée',
         autoMerged:'mini-blocs auto-fusionnés par colonne (x,z)',
         clickHint:'Clique un nom — ou un bloc en 3D — pour le sélectionner',
+    },
+    ja:{
+        import:'.bloxdschem インポート', detect:'検出&分割', download:'ZIP保存',
+        detectTitle:'ユニットを検出して分離', downloadTitle:'ZIP保存',
+        drop:'.bloxdschemをドロップ', unit:'ユニット', blocks:'ブロック',
+        unitsDetected:'ユニット検出', platformRemoved:'プラットフォーム削除',
+        merged:'座標でマージ', imported:'インポート済み', nothing:'未読込',
+        detecting:'検出中...', noUnits:'ユニットなし',
+        autoMerged:'(x,z)列で自動融合', clickHint:'名前または3Dブロックをクリックで選択',
+    },
+    ko:{
+        import:'.bloxdschem 가져오기', detect:'감지&분할', download:'ZIP 저장',
+        detectTitle:'유닛 감지 및 분리', downloadTitle:'ZIP 저장',
+        drop:'.bloxdschem 드롭', unit:'유닛', blocks:'블록',
+        unitsDetected:'유닛 감지됨', platformRemoved:'플랫폼 블록 제거됨',
+        merged:'좌표로 병합', imported:'가져옴', nothing:'로드 안 됨',
+        detecting:'감지 중...', noUnits:'유닛 없음',
+        autoMerged:'(x,z) 열별 자동 병합', clickHint:'이름 또는 3D 블록 클릭하여 선택',
+    },
+    th:{
+        import:'นำเข้า .bloxdschem', detect:'ตรวจจับ&แยก', download:'บันทึก ZIP',
+        detectTitle:'ตรวจจับและแยกยูนิต', downloadTitle:'บันทึก ZIP',
+        drop:'วาง .bloxdschem ที่นี่', unit:'ยูนิต', blocks:'บล็อก',
+        unitsDetected:'ยูนิตที่ตรวจพบ', platformRemoved:'บล็อกแพลตฟอร์มถูกลบ',
+        merged:'รวมด้วยพิกัด', imported:'นำเข้าแล้ว', nothing:'ยังไม่ได้โหลด',
+        detecting:'กำลังตรวจจับ...', noUnits:'ไม่พบยูนิต',
+        autoMerged:'รวมอัตโนมัติตามคอลัมน์ (x,z)', clickHint:'คลิกชื่อหรือบล็อก 3D เพื่อเลือก',
     }
 };
 function t(k){const l=(typeof localStorage!=='undefined'&&localStorage.getItem(LANG_KEY))||'en';return(T[l]||T.en)[k]||k;}
