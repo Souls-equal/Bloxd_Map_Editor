@@ -44,7 +44,8 @@ window.I18N = {
             searchName: "Search name...",
             noAssets: "No asset matches the filters.",
             blocksShort: "blocks",
-            assetsShort: "assets"
+            assetsShort: "assets",
+            autoTerraform: "Auto-terraform (foundation):"
         },
         fr: {
             library: "📚 Bibliothèque d'assets",
@@ -82,7 +83,8 @@ window.I18N = {
             searchName: "Rechercher un nom...",
             noAssets: "Aucun asset ne correspond aux filtres.",
             blocksShort: "blocs",
-            assetsShort: "assets"
+            assetsShort: "assets",
+            autoTerraform: "Auto-terraformer (fondations) :"
         }
     },
 
