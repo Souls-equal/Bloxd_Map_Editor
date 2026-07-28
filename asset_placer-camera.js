@@ -113,7 +113,7 @@ window.setupCamera = function(scene, canvas) {
     });
 
     scene.onBeforeRenderObservable.add(() => {
-        const speed = 1.25;  // vitesse de base ×2.5 (était 0.5)
+        const speed = 1.5;  // vitesse de base (×3 vs l'originale 0.5)
         const sprint = (inputMap['shift'] || inputMap['ShiftLeft'] || inputMap['ShiftRight']) ? 3 : 1;
         const sp = speed * sprint;
         const forward = camera.getDirection(BABYLON.Axis.Z);
