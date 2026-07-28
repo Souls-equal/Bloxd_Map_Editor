@@ -19,7 +19,7 @@ const I18N = {
         terrain_desc: "Sculptez et peignez le terrain de votre monde en 3D : élévation, pinceaux, biomes et import/export.",
         asset_tag: "Décoration",
         asset_desc: "Placez des objets, constructions et assets personnalisés sur votre terrain avec une bibliothèque organisée.",
-        footer: "Bloxd Tools v6.4.1 — Langue et clavier partagés entre tous les éditeurs via le menu",
+        footer: "Bloxd Tools v6.8.0 — Langue et clavier partagés entre tous les éditeurs via le menu",
         lang_label: "Langue / Language",
         lang_note: "Appliqué à tous les éditeurs. Garde le choix d'une visite à l'autre.",
         kb_label: "Disposition clavier",
@@ -88,7 +88,7 @@ const I18N = {
         terrain_desc: "Sculpt and paint your world's terrain in 3D: elevation, brushes, biomes and import/export.",
         asset_tag: "Props",
         asset_desc: "Place objects, builds and custom assets on your terrain with an organized library.",
-        footer: "Bloxd Tools v6.4.1 — Language and keyboard shared across all editors via the",
+        footer: "Bloxd Tools v6.8.0 — Language and keyboard shared across all editors via the",
         lang_note: "Applied to all editors. Remembered between visits.",
         kb_label: "Keyboard layout",
         kb_note: "Controls camera movement keys (ZQSD/WASD) in all editors.",
@@ -142,22 +142,64 @@ const I18N = {
             "🖥️ <b>Wheel</b>: zoom",
             "🎮 <b>WASD/ZQSD</b>: fly · <b>Space/Ctrl</b>: up/down · <b>Shift</b>: ×10",
         ],
+    },
+    ja: {
+        brand_sub: "エディタスイート", settings: "設定",
+        hero_title: "エディタを選択",
+        hero_sub: "Bloxd.ioのスケマティックを作成、組み立て、エクスポートする3Dツールスイートです。使いたいエディタを選んでください。",
+        schem_tag: "アセンブリ", schem_desc: ".bloxdschemを読み込み、移動、分割、結合して再エクスポート。正確な配置。",
+        open: "開く", soon: "近日",
+        terrain_tag: "地形", terrain_desc: "3Dで地形を彫刻・ペイント：標高、ブラシ、バイオーム、インポート/エクスポート。",
+        asset_tag: "配置", asset_desc: "整理されたライブラリでオブジェクトや建物を地形に配置。",
+        footer: "Bloxd Tools v6.8.0 — すべてのエディタで言語・キーボード共有",
+        lang_label: "言語", lang_note: "すべてのエディタに適用。記憶されます。",
+        kb_label: "キーボード配列", kb_note: "移動キー（ZQSD/WASD）を制御。",
+        close: "閉じる",
+        splitter_tag: "準備", splitter_desc: "大きなスケマを読み込み、各ユニットを検出、ZIPエクスポート。",
+    },
+    ko: {
+        brand_sub: "에디터 모음", settings: "설정",
+        hero_title: "에디터 선택",
+        hero_sub: "Bloxd.io 스케매틱을 제작, 조립 및 내보내기하는 3D 도구 모음입니다. 원하는 에디터를 선택하세요.",
+        schem_tag: "조립", schem_desc: ".bloxdschem 불러오기, 이동, 분할, 병합 후 다시 내보내기. 정밀 배치.",
+        open: "열기", soon: "준비 중",
+        terrain_tag: "지형", terrain_desc: "3D로 지형 조각 및 페인트: 고도, 브러시, 바이옴, 가져오기/내보내기.",
+        asset_tag: "소품", asset_desc: "정리된 라이브러리로 지형에 오브젝트와 건물 배치.",
+        footer: "Bloxd Tools v6.8.0 — 모든 에디터에서 언어·키보드 공유",
+        lang_label: "언어", lang_note: "모든 에디터에 적용됩니다.",
+        kb_label: "키보드 배치", kb_note: "이동 키(ZQSD/WASD)를 제어합니다.",
+        close: "닫기",
+        splitter_tag: "준비", splitter_desc: "큰 스케매 불러오기, 각 유닛 감지, ZIP 내보내기.",
+    },
+    th: {
+        brand_sub: "ชุดเครื่องมือแก้ไข", settings: "ตั้งค่า",
+        hero_title: "เลือกเครื่องมือ",
+        hero_sub: "ชุดเครื่องมือ 3D สำหรับสร้าง ประกอบ และส่งออกสเคมาติก Bloxd.io เลือกเครื่องมือที่ต้องการใช้",
+        schem_tag: "ประกอบ", schem_desc: "โหลด ย้าย ตัด และรวมไฟล์ .bloxdschem แล้วส่งออกใหม่ จัดวางอย่างแม่นยำ",
+        open: "เปิด", soon: "เร็วๆ นี้",
+        terrain_tag: "ภูมิประเทศ", terrain_desc: "แกะสลักและวาดภูมิประเทศใน 3D: ความสูง แปรง ไบโอม นำเข้า/ส่งออก",
+        asset_tag: "อุปกรณ์", asset_desc: "วางวัตถุและอาคารบนภูมิประเทศด้วยไลบรารีที่จัดระเบียบ",
+        footer: "Bloxd Tools v6.8.0 — แชร์ภาษาและคีย์บอร์ดระหว่างเครื่องมือทั้งหมด",
+        lang_label: "ภาษา", lang_note: "ใช้กับเครื่องมือทั้งหมด จดจำไว้สำหรับครั้งต่อไป",
+        kb_label: "เลย์เอาต์คีย์บอร์ด", kb_note: "ควบคุมปุ่มเคลื่อนที่ (ZQSD/WASD)",
+        close: "ปิด",
+        splitter_tag: "เตรียม", splitter_desc: "โหลดสเคมาใหญ่ ตรวจจับแต่ละยูนิต ส่งออกเป็น ZIP",
     }
 };
-
 function getLang() {
     const l = localStorage.getItem(LANG_KEY) || 'en';
-    return l === 'en' ? 'en' : 'fr';
+    return I18N[l] ? l : 'en';
 }
-
 function applyLang(lang) {
-    lang = (lang === 'en') ? 'en' : 'fr';
+    if (!I18N[lang]) lang = 'en';
     localStorage.setItem(LANG_KEY, lang);
     document.documentElement.lang = lang;
     const dict = I18N[lang];
+    const fb = I18N.en;
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (dict[key] !== undefined) el.textContent = dict[key];
+        else if (fb[key] !== undefined) el.textContent = fb[key];
     });
     const pill = document.getElementById('lang-pill');
     if (pill) pill.textContent = lang.toUpperCase();
@@ -211,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault(); e.stopPropagation();
             const ed = btn.dataset.help;
             const dict = I18N[getLang()];
-            const items = dict['help_' + ed];
+            const items = dict['help_' + ed] || I18N.en['help_' + ed];
             if (items) {
                 helpTitle.textContent = '❓ ' + (editorNames[ed] || ed);
                 helpList.innerHTML = items.map(t => '<li style="padding:3px 0;">' + t + '</li>').join('');
