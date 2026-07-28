@@ -95,7 +95,7 @@
         Quartz:         0xf4efe4,
         Moonstone:      0x8ab8e0,
         Magma:          0xff6a1f,
-        Water:          rgba(90, 197, 232, 0.65),
+        Water:          0x2a7bc0,
         Ice:            0xa8d6ee,
         Snow:           0xf5f9fc,
         Glass:          0xcfe8f5,
