@@ -391,7 +391,10 @@ class Map2D {
         const base=this._biomeRGB(baseHex);
         let r,g,b;
         let hasDiff=false;
+        // Sous l'eau → pas de mélange de biomes (sable pur, pas de vert qui bave)
+        if(cell.height>this.generator.config.seaLevel){
         for(let dx=-1;dx<=1&&!hasDiff;dx++){for(let dz=-1;dz<=1;dz++){const nx=gx+dx,nz=gz+dz;if(nx<0||nx>=resX||nz<0||nz>=resZ)continue;if(grid[nx][nz].biome!==cellBiome){hasDiff=true;break;}}}
+        }
         if(!hasDiff){r=base[0];g=base[1];b=base[2];}
         else{
             const R=2;let rr=0,gg=0,bb=0,wSum=0;
