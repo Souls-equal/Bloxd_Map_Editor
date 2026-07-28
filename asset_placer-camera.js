@@ -113,7 +113,7 @@ window.setupCamera = function(scene, canvas) {
     });
 
     scene.onBeforeRenderObservable.add(() => {
-        const speed = 3.0;  // vitesse de base (×6 vs l'originale 0.5)
+        const speed = 5.0;  // vitesse de base (×6 vs l'originale 0.5)
         const sprint = (inputMap['shift'] || inputMap['ShiftLeft'] || inputMap['ShiftRight']) ? 3 : 1;
         const sp = speed * sprint;
         const forward = camera.getDirection(BABYLON.Axis.Z);
@@ -175,7 +175,7 @@ window.setupCamera = function(scene, canvas) {
 
     canvas.addEventListener("wheel", (evt) => {
         evt.preventDefault();
-        const zoomSpeed = 2.5;
+        const zoomSpeed = 4.25;
         const fwd = camera.getDirection(BABYLON.Axis.Z);
         camera.position.addInPlace(fwd.scale(Math.sign(evt.deltaY) * -zoomSpeed));
     }, { passive: false });
