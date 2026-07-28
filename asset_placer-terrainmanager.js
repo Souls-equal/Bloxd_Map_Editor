@@ -10,6 +10,7 @@ window.TerrainManager = class TerrainManager {
         this.gridMesh = gridMesh || scene.getMeshByName('grid');
 
         this.terrainMesh = null;
+        this.waterMesh = null;
         this.terrainData = null;
         this.terrainBlocks = [];
         this.terrainPosition = new BABYLON.Vector3(0, 0, 0);
@@ -92,10 +93,11 @@ window.TerrainManager = class TerrainManager {
     clearTerrain(showDefaultGround = true) {
         this.importToken++;
         if (this.terrainMesh) { this.terrainMesh.material?.dispose(); this.terrainMesh.dispose(); this.terrainMesh = null; }
+        if (this.waterMesh) { this.waterMesh.material?.dispose(); this.waterMesh.dispose(); this.waterMesh = null; }
         for (const mesh of this.tileMeshes.values()) { mesh.material?.dispose(); mesh.dispose(); }
         if (this.terrainSelectionProxy) { this.terrainSelectionProxy.material?.dispose(); this.terrainSelectionProxy.dispose(); this.terrainSelectionProxy = null; }
         this.tileMeshes.clear(); this.tileBuildQueue = []; this.tileBuildQueued.clear(); this.heightTiles.clear(); this.heightBounds = null;
-        this.heightSurface = null; this.heightOrigin = null;
+        this.heightSurface = null; this.heightOrigin = null; this.heightWater = null;
         this.mode = 'none'; this.terrainData = null; this.terrainBlocks = []; this.terrainPosition.set(0, 0, 0);
         if (showDefaultGround) this._setDefaultGroundVisible(true);
         this._notifyChanged();
@@ -219,9 +221,11 @@ window.TerrainManager = class TerrainManager {
         const name = this._readAvroString(buf, off);
         const px = this._readAvroInt(buf, off), py = this._readAvroInt(buf, off), pz = this._readAvroInt(buf, off);
         this._readAvroInt(buf, off); this._readAvroInt(buf, off); this._readAvroInt(buf, off); // sx,sy,sz ignorés
-        const CHUNK = 32;
-        const cols = new Map();            // "wx,wz" -> {y, id}
+        const CHUNK = 32, WATER = 126;
+        const cols = new Map();        // sommet SOLIDE (non eau) : "wx,wz" -> {y, id}
+        const waterCols = new Map();   // surface d'EAU : "wx,wz" -> y (le + haut)
         let mnX = Infinity, mxX = -Infinity, mnZ = Infinity, mxZ = -Infinity;
+        let mnY = Infinity, mxY = -Infinity;
         let processed = 0;
         while (off.v < buf.length) {
             let bc = this._readAvroInt(buf, off);
@@ -240,16 +244,24 @@ window.TerrainManager = class TerrainManager {
                         const lx = (idx / 1024) | 0, ly = ((idx % 1024) / 32) | 0, lz = idx % 32;
                         const wx = baseX + lx, wy = baseY + ly, wz = baseZ + lz;
                         const key = wx + ',' + wz;
-                        const c = cols.get(key);
-                        if (!c || wy > c.y) cols.set(key, { y: wy, id: bid });
-                        if (wx < mnX) mnX = wx; if (wx > mxX) mxX = wx;
-                        if (wz < mnZ) mnZ = wz; if (wz > mxZ) mxZ = wz;
+                        if (bid === WATER) {
+                            const w = waterCols.get(key);
+                            if (w === undefined || wy > w) waterCols.set(key, wy);
+                        } else {
+                            const c = cols.get(key);
+                            if (!c || wy > c.y) {
+                                cols.set(key, { y: wy, id: bid });
+                                if (wy < mnY) mnY = wy; if (wy > mxY) mxY = wy;
+                            }
+                            if (wx < mnX) mnX = wx; if (wx > mxX) mxX = wx;
+                            if (wz < mnZ) mnZ = wz; if (wz > mxZ) mxZ = wz;
+                        }
                     }
                 }
             }
             if ((++processed & 31) === 0) await this._yieldToBrowser();
         }
-        return { name, cols, bounds: { minX: mnX, minZ: mnZ, maxX: mxX, maxZ: mxZ } };
+        return { name, cols, waterCols, bounds: { minX: mnX, minZ: mnZ, maxX: mxX, maxZ: mxZ, minY: mnY, maxY: mxY } };
     }
 
     // Map<cléChunk, Int32Array> -> [{x,y,z,id}] (format attendu par le reste du code).
@@ -359,27 +371,65 @@ window.TerrainManager = class TerrainManager {
     _setHeightmapTerrain(hm, fileName) {
         this.clearTerrain(false);
         this.mode = 'heightmap';
-        const cols = hm.cols, b = hm.bounds;
+        const cols = hm.cols, waterCols = hm.waterCols, b = hm.bounds;
         const minX = isFinite(b.minX) ? b.minX : 0;
         const minZ = isFinite(b.minZ) ? b.minZ : 0;
-        let minY = Infinity, maxY = -Infinity;
-        for (const v of cols.values()) { if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y; }
-        if (!isFinite(minY)) minY = 0;
-        if (!isFinite(maxY)) maxY = minY;
+        let minY = isFinite(b.minY) ? b.minY : 0;
+        let maxY = isFinite(b.maxY) ? b.maxY : minY;
         const sx = Math.max(1, (isFinite(b.maxX) ? b.maxX : 0) - minX + 1);
         const sz = Math.max(1, (isFinite(b.maxZ) ? b.maxZ : 0) - minZ + 1);
         const sy = Math.max(1, maxY - minY + 1);
-        this.heightSurface = cols;                 // Map<"x,z" raw, {y,id}> pour l'export
+        this.heightSurface = cols;                 // sommet solide (pour export + rendu)
+        this.heightWater = waterCols;              // surface d'eau (rendu transparent)
         this.heightOrigin = { x: minX, y: minY, z: minZ };
         this.terrainData = { name: fileName, mode: 'heightmap', size: { x: sx, y: sy, z: sz }, totalColumns: cols.size };
         this.terrainBlocks = [];
         this.terrainPosition.set(-Math.floor(sx / 2), 0, -Math.floor(sz / 2));
-        const mesh = this._renderHeightmapSurface(cols, minX, minY, minZ, fileName);
-        if (mesh) { mesh.position.copyFrom(this.terrainPosition); this.terrainMesh = mesh; }
+        const solid = this._renderHeightmapSurface(cols, minX, minY, minZ, fileName);
+        if (solid) { solid.position.copyFrom(this.terrainPosition); this.terrainMesh = solid; }
+        const water = this._renderWaterSurface(waterCols, minX, minY, minZ);
+        if (water) { water.position.copyFrom(this.terrainPosition); this.waterMesh = water; }
         this._updateTerrainSelectionProxy();
         this._setDefaultGroundVisible(false);
         this._notifyChanged();
         return this.terrainData;
+    }
+
+    // Surface d'EAU : quads transparents (bleus), NON pickables → on voit le sable
+    // dessous (mesh solide) et l'eau ne bloque pas le placement des bâtiments.
+    _renderWaterSurface(waterCols, minX, minY, minZ) {
+        const n = waterCols.size;
+        if (!n) return null;
+        const positions = new Float32Array(n * 12);
+        const indices = new Uint32Array(n * 6);
+        const normals = new Float32Array(n * 12);
+        const fp = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5];
+        const fi = [0, 2, 1, 0, 3, 2];
+        let pi = 0, ii = 0, ni = 0, vi = 0;
+        for (const [key, wy] of waterCols) {
+            const p = key.split(','); const lx = (+p[0]) - minX, lz = (+p[1]) - minZ, ly = wy - minY;
+            for (let v = 0; v < 4; v++) {
+                positions[pi++] = fp[v * 3] + lx + 0.5;
+                positions[pi++] = fp[v * 3 + 1] + ly + 1;
+                positions[pi++] = fp[v * 3 + 2] + lz + 0.5;
+                normals[ni++] = 0; normals[ni++] = 1; normals[ni++] = 0;
+            }
+            for (let i = 0; i < 6; i++) indices[ii++] = fi[i] + vi;
+            vi += 4;
+        }
+        const vd = new BABYLON.VertexData();
+        vd.positions = positions; vd.indices = indices; vd.normals = normals;
+        const mesh = new BABYLON.Mesh('terrainWater', this.scene);
+        vd.applyToMesh(mesh);
+        const mat = new BABYLON.StandardMaterial('terrainWaterMat', this.scene);
+        mat.diffuseColor = new BABYLON.Color3(0.16, 0.52, 0.78);
+        mat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+        mat.alpha = 0.6;                 // transparent → on voit le sable dessous
+        mat.backFaceCulling = false;
+        mesh.material = mat;
+        mesh.isPickable = false;         // l'eau ne bloque PAS le placement
+        mesh.metadata = { isWater: true };
+        return mesh;
     }
 
     // Surface du terrain : DESSUS + FACES LATÉRALES (jupes vers voisins plus bas / bords).
