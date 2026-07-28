@@ -35,25 +35,21 @@ window.Exporter = class Exporter {
         }
 
         for (const inst of this.assetManager.instances) {
-            const template = this.assetManager.templates[inst.name];
-            const schem = this.assetManager.getTemplateSchem(inst.name) || (template && template.schemData);
+            const schem = this.assetManager.getTemplateSchem(inst.name);
             if (!schem?.blocks) continue;
 
-            const posX = Math.round(inst.position.x);
-            const posY = Math.round(inst.position.y);
-            const posZ = Math.round(inst.position.z);
-            const rot = inst.rotationY;
-            const sx = schem.size?.x || 4;
-            const sz = schem.size?.z || 4;
-
+            const co = inst._centerOffset || { x: 0, z: 0 };
+            inst.mesh.computeWorldMatrix(true);
+            const wm = inst.mesh.getWorldMatrix();
+            const tmp = new BABYLON.Vector3();
             for (const block of schem.blocks) {
                 if (!block || block.id === 0) continue;
-                let rx = block.x, rz = block.z;
-                if (rot === 90) { rx = -block.z + (sz - 1); rz = block.x; }
-                else if (rot === 180) { rx = -block.x + (sx - 1); rz = -block.z + (sz - 1); }
-                else if (rot === 270) { rx = block.z; rz = -block.x + (sx - 1); }
+                // Position du bloc dans la géométrie recentrée, puis matrice monde du mesh
+                // (= exactement ce qu'on voit à l'écran, rotation centrée comprise).
+                tmp.set(block.x - co.x, block.y, block.z - co.z);
+                BABYLON.Vector3.TransformToRef(tmp, wm, tmp);
                 putBlock({
-                    x: posX + rx, y: posY + block.y, z: posZ + rz,
+                    x: Math.round(tmp.x), y: Math.round(tmp.y), z: Math.round(tmp.z),
                     id: block.id, data: block.data || 0
                 }, 'asset', inst);
             }
