@@ -41,6 +41,10 @@ window.UIManager = class UIManager {
                     <label for="prop-priority-assets">Priority over assets:</label>
                     <input type="checkbox" id="prop-priority-assets">
                 </div>
+                <div class="prop-group prop-check-group">
+                    <label for="prop-autoterraform" data-i18n="autoTerraform">Auto-terraform:</label>
+                    <input type="checkbox" id="prop-autoterraform">
+                </div>
                 <div class="prop-actions">
                     <button id="btn-duplicate" class="ui-btn" data-i18n="duplicate">📋 Duplicate</button>
                     <button id="btn-delete" class="ui-btn danger" data-i18n="delete">🗑️ Delete</button>
@@ -87,6 +91,11 @@ window.UIManager = class UIManager {
         document.getElementById('prop-locked').disabled = isTerrain;
         document.getElementById('prop-priority-terrain').checked = !!instance.priorityOverTerrain;
         document.getElementById('prop-priority-assets').checked = !!instance.priorityOverAssets;
+        const at = document.getElementById('prop-autoterraform');
+        if (at) {
+            at.checked = !!instance.autoTerraform;
+            at.disabled = isTerrain;
+        }
         document.getElementById('btn-duplicate').disabled = isTerrain;
         document.getElementById('btn-delete').disabled = isTerrain || instance.locked;
     }
@@ -144,6 +153,11 @@ window.UIManager = class UIManager {
         });
         document.getElementById('prop-priority-assets').addEventListener('change', () => {
             const i = inst(); if (i) i.priorityOverAssets = document.getElementById('prop-priority-assets').checked;
+        });
+        // Auto-terraform (socle de terrain sous le schem)
+        document.getElementById('prop-autoterraform').addEventListener('change', () => {
+            const i = inst(); if (!i || i.isTerrainSelection) return;
+            i.setAutoTerraform(document.getElementById('prop-autoterraform').checked);
         });
     }
 };
