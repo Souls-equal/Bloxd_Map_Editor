@@ -298,6 +298,9 @@ class TerrainGenerator {
         const ruleBiome = this.getRuleBiomeForHeight(height);
         if (ruleBiome) return ruleBiome;
 
+        // SOUS L'EAU → toujours sable (hauteur RÉELLE, avant le warp qui raterait la zone inondée)
+        if (height <= this.config.seaLevel) return 'sand';
+
         // 2) Distorsion légère des biomes (biome warp)
         let warp = (this.valueNoise2D(worldX * 0.01, worldZ * 0.01) - 0.5) * 15;
         let effH = height + warp;
@@ -1789,7 +1792,7 @@ if __name__ == "__main__":
                                 const hDet = (this.valueNoise2D(wxS * 0.35 + 7.3, wzS * 0.35 + 2.1) - 0.5) * 1.6 * gdE;
                                 h = Math.round(hIdw + hDet);
                             }
-                            bkey = customEdit.biome || "plain";
+                            bkey = customEdit.biome || this.assignBiomeProcedural(h, wxS, wzS);
                             // REGLE PRIORITAIRE : la règle verrouillée gagne sur la peinture
                             const lockedBy = this.isBiomePaintBlocked(h);
                             if (lockedBy) bkey = lockedBy;
