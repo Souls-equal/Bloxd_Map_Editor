@@ -113,7 +113,9 @@ window.setupCamera = function(scene, canvas) {
     });
 
     scene.onBeforeRenderObservable.add(() => {
-        const speed = 0.5;
+        const speed = 1.25;  // vitesse de base ×2.5 (était 0.5)
+        const sprint = (inputMap['shift'] || inputMap['ShiftLeft'] || inputMap['ShiftRight']) ? 3 : 1;
+        const sp = speed * sprint;
         const forward = camera.getDirection(BABYLON.Axis.Z);
         const right = camera.getDirection(BABYLON.Axis.X);
         forward.normalize();
@@ -121,13 +123,13 @@ window.setupCamera = function(scene, canvas) {
 
         const isQwerty = window.I18N && window.I18N.keyboard === 'qwerty';
 
-        if (inputMap['z'] || inputMap['w']) camera.position.addInPlace(forward.scale(speed));
-        if (inputMap['s']) camera.position.addInPlace(forward.scale(-speed));
-        if ((!isQwerty && inputMap['q']) || (isQwerty && inputMap['a'])) camera.position.addInPlace(right.scale(-speed));
-        if (inputMap['d']) camera.position.addInPlace(right.scale(speed));
+        if (inputMap['z'] || inputMap['w']) camera.position.addInPlace(forward.scale(sp));
+        if (inputMap['s']) camera.position.addInPlace(forward.scale(-sp));
+        if ((!isQwerty && inputMap['q']) || (isQwerty && inputMap['a'])) camera.position.addInPlace(right.scale(-sp));
+        if (inputMap['d']) camera.position.addInPlace(right.scale(sp));
 
-        if (inputMap['Space'] || inputMap[' ']) camera.position.y += speed;
-        if (inputMap['ControlLeft'] || inputMap['ControlRight'] || inputMap['control']) camera.position.y -= speed;
+        if (inputMap['Space'] || inputMap[' ']) camera.position.y += sp;
+        if (inputMap['ControlLeft'] || inputMap['ControlRight'] || inputMap['control']) camera.position.y -= sp;
     });
 
     camera.speed = 0.5;
