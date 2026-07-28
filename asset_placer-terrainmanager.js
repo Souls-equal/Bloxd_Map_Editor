@@ -122,6 +122,25 @@ window.TerrainManager = class TerrainManager {
         return [];
     }
 
+    // Surface block id à une position WORLD (x,z) — pour l'auto-terraform (matériau du sol).
+    getSurfaceBlockAtWorld(wx, wz) {
+        if (this.mode === 'heightmap' && this.heightSurface) {
+            const o = this.heightOrigin || { x: 0, z: 0 };
+            const ox = Math.round(this.terrainPosition.x), oz = Math.round(this.terrainPosition.z);
+            const c = this.heightSurface.get((wx - ox + o.x) + ',' + (wz - oz + o.z));
+            return c ? c.id : null;
+        }
+        if (this.mode === 'full' && this.terrainBlocks) {
+            const ox = Math.round(this.terrainPosition.x), oz = Math.round(this.terrainPosition.z);
+            let best = null, bestY = -Infinity;
+            for (const b of this.terrainBlocks) {
+                if ((b.x + ox) === wx && (b.z + oz) === wz && b.y > bestY) { bestY = b.y; best = b.id; }
+            }
+            return best;
+        }
+        return null;
+    }
+
     _setDefaultGroundVisible(visible) {
         if (this.groundMesh) { this.groundMesh.setEnabled(visible); this.groundMesh.isVisible = visible; this.groundMesh.isPickable = visible; }
         if (this.gridMesh) { this.gridMesh.setEnabled(visible); this.gridMesh.isVisible = visible; this.gridMesh.isPickable = false; }
