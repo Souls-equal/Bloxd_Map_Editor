@@ -42,16 +42,30 @@ window.Exporter = class Exporter {
             inst.mesh.computeWorldMatrix(true);
             const wm = inst.mesh.getWorldMatrix();
             const tmp = new BABYLON.Vector3();
+            const footprint = inst.autoTerraform ? new Map() : null; // "wx,wz" -> min wy
             for (const block of schem.blocks) {
                 if (!block || block.id === 0) continue;
-                // Position du bloc dans la géométrie recentrée, puis matrice monde du mesh
-                // (= exactement ce qu'on voit à l'écran, rotation centrée comprise).
                 tmp.set(block.x - co.x, block.y, block.z - co.z);
                 BABYLON.Vector3.TransformToRef(tmp, wm, tmp);
-                putBlock({
-                    x: Math.round(tmp.x), y: Math.round(tmp.y), z: Math.round(tmp.z),
-                    id: block.id, data: block.data || 0
-                }, 'asset', inst);
+                const wx = Math.round(tmp.x), wy = Math.round(tmp.y), wz = Math.round(tmp.z);
+                putBlock({ x: wx, y: wy, z: wz, id: block.id, data: block.data || 0 }, 'asset', inst);
+                if (footprint) {
+                    const k = wx + ',' + wz;
+                    const prev = footprint.get(k);
+                    if (prev === undefined || wy < prev) footprint.set(k, wy);
+                }
+            }
+            // Auto-terraform : remplit du terrain (matériau du sol) sous chaque colonne du schem.
+            if (footprint) {
+                const tm = this.terrainManager;
+                for (const [k, baseY] of footprint) {
+                    const p = k.split(','); const wx = +p[0], wz = +p[1];
+                    let gid = (tm && tm.getSurfaceBlockAtWorld) ? tm.getSurfaceBlockAtWorld(wx, wz) : null;
+                    if (!gid) gid = 2; // dirt
+                    for (let y = baseY - 1; y >= baseY - 5; y--) {
+                        putBlock({ x: wx, y, z: wz, id: gid, data: 0 }, 'asset', inst);
+                    }
+                }
             }
         }
 
