@@ -79,6 +79,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
         window.appExporter = new window.Exporter(assetManager, terrainManager);
 
+        // === Sauvegarde / restauration des positions d'assets ===
+        // Créé APRÈS ExplorerUI pour chaîner son onChanged sans l'écraser.
+        if (window.SceneManager) {
+            window.appSceneManager = new window.SceneManager(assetManager, selectionManager);
+            window.appSceneManager.attachAutoSave();
+        }
+
         libraryUI.populateLibrary();
 
         if (window.SchematicLibraryLoader) {
@@ -86,7 +93,18 @@ window.addEventListener('DOMContentLoaded', () => {
             window.appSchematicLibraryLoader = loader;
             loader.loadFromProjectFolder().then(count => {
                 if (count > 0) libraryUI.populateLibrary();
+                // Restaure la session sauvegardée MAINTENANT que les templates sont chargés.
+                if (window.appSceneManager && window.appSceneManager.hasLocalSave()) {
+                    const n = window.appSceneManager.loadFromLocal();
+                    if (n > 0) {
+                        const msg = (window.I18N.t('autoRestored') || 'Restored {n} assets').split('{n}').join(n);
+                        window.SceneManager.toast(msg, 'success');
+                    }
+                }
             });
+        } else if (window.appSceneManager && window.appSceneManager.hasLocalSave()) {
+            // Pas de loader asynchrone : restauration immédiate.
+            window.appSceneManager.loadFromLocal();
         }
 
         return scene;
