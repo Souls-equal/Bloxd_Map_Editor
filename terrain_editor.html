@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- La version du titre doit suivre le numéro du zip livré (+0.1 à chaque mise à jour) -->
+    <title>Bloxd Terrain Editor — v4.3.0</title>
+    <!-- Architecture multi-fichiers : tous les fichiers terrain_editor.* doivent rester dans le MÊME dossier -->
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAA5FBMVEVHcEwAAACb6W+BVTpmQiwvGQyt8YQmFAqYZ0Z71FSK317R0dGt8YIZbQ9lQixrw0lAIxM4HA7CwsKtra2U4mqX5m6h7HWJ4F6M3mCg6Xau742s8oITXA0ZbBQbahGZ6W6a6G4TXAscWRIXbg8wGQsSXQs4HA961VR/01Ws7oQlEgsgdhMwMTOve1Oc6W8jEghvUDiM4WITXApqwkhSpDVSpDSw84I4HQyueVKZkItjPiZUpDRpQCdnxEWWaEZ0w09wQylqxElSpTSJXkRSpDZOnzBGTB9lQi2BVTuYkYq4uLikpaao1sLHAAAAAXRSTlMAQObYZgAAALZJREFUGNNNz1dTAkEQBODr3t3LgfMEBQNKUAmSRDGDokj4//+Hc+8srx/m4auZqmnDyAIYxQDHRwUCHIc0D/8ENzzxXdcsM1sCx65pkqyQ9V/B15wD8oJVnjY1/HxHD7x2WAsCS8Nm9fly53cuz9tDpWG9/HgLpz2rcdaKNchFKEU06QOl7ES8CmHfdxU8XGl4f356lHJm4cDLHxnZwpZKYZtK/vqtEKUYuwT/bWyFNEmxoB4w9nFzDKT7ft/PAAAAAElFTkSuQmCC">
+    <link rel="stylesheet" href="terrain_editor.css">
+</head>
+
+<body>
+
+    <!-- Écran de chargement initial -->
+    <div id="app-loading" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0b0d13; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.4s ease;">
+        <div style="font-size: 2.5rem; color: #4aa8ff; margin-bottom: 16px;"><i class="fas fa-cube fa-spin"></i></div>
+        <h2 style="color: #fff; font-family: sans-serif; font-size: 1.4rem;" data-i18n="loadingTitle">Génération de l'univers Bloxd...</h2>
+        <p style="color: #8c95ac; margin-top: 8px;" data-i18n="loadingSub">Initialisation des moteurs 2D & 3D Voxel</p>
+    </div>
+
+    <div id="app-container">
+        <!-- PANEL GAUCHE -->
+        <aside id="app-panel">
+            <header class="panel-header">
+                <div class="app-title" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding-right: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="logo-icon"><i class="fas fa-cube"></i></span>
+                        <span data-i18n="appTitle">Bloxd Terrain Editor</span>
+                    </div>
+                    <a href="index.html" title="⌂ Menu principal" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); width:34px;height:34px;border-radius:20px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:1rem;box-shadow:0 2px 5px rgba(0,0,0,0.2);transition:all 0.2s;">🏠</a>
+                </div>
+                <nav class="tabs-nav">
+                    <button class="tab-btn active" id="tab-btn-settings" data-i18n="tabSettings">
+                        <i class="fas fa-sliders-h"></i> Paramètres
+                    </button>
+                    <button class="tab-btn" id="tab-btn-editor" data-i18n="tabEditor">
+                        <i class="fas fa-paint-brush"></i> Éditeur
+                    </button>
+                </nav>
+            </header>
+
+            <div class="panel-content">
+                <!-- ONGLET 1 : PARAMÈTRES -->
+                <div class="tab-panel active" id="panel-settings">
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-globe"></i> <span data-i18n="secDimensions">Dimensions du Monde</span></div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelWidthX">Largeur X</label>
+                                <input type="number" class="input-text" id="cfg-world-x" value="4000" step="100" min="500">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelLengthZ">Longueur Z</label>
+                                <input type="number" class="input-text" id="cfg-world-z" value="4000" step="100" min="500">
+                            </div>
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelSeed">Graine (Seed)</label>
+                                <div class="input-with-btn">
+                                    <input type="number" class="input-text" id="cfg-seed" value="54321">
+                                    <button class="icon-btn" id="btn-random-seed" data-i18n-title="titleRandomSeed" title="Graine aléatoire"><i class="fas fa-dice"></i></button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelGroundDetail" data-i18n-title="titleGroundDetail" title="Micro-relief ajouté au sol en vue rapprochée et à l'export (bosses de ±1 bloc). 0 = sol lisse.">Détail du sol</label>
+                                <select class="select-input" id="cfg-ground-detail">
+                                    <option value="0">⬜ Lisse (aucun)</option>
+                                    <option value="0.5">🌿 Léger</option>
+                                    <option value="1" selected>🌾 Normal</option>
+                                    <option value="2">🪨 Accidenté</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: -4px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                                <input type="checkbox" id="cfg-flat-terrain">
+                                <span data-i18n="labelFlatTerrain" data-i18n-title="titleFlatTerrain" title="Le terrain de base est entièrement plat (la graine n'a plus d'effet sur le relief). Astuce : mets aussi 'Détail du sol' sur Lisse pour un sol parfaitement plan.">🏜️ Terrain 100% plat (ignorer la graine)</span>
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin-top: -4px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                                <input type="checkbox" id="cfg-island-mode">
+                                <span data-i18n="labelIslandMode" data-i18n-title="titleIslandMode" title="Le terrain plonge sous l'eau aux bords pour créer une île entourée d'océan.">🏝️ Mode île (entouré d'eau)</span>
+                            </label>
+                        </div>
+                        <div class="form-grid-2">
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelBaseY">Base Y</label>
+                                <input type="number" class="input-text" id="cfg-base-y" value="70">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" data-i18n="labelSeaLevel">Niveau Eau</label>
+                                <input type="number" class="input-text" id="cfg-sea-level" value="88">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-shapes"></i> <span data-i18n="secShape">Forme de la carte</span></div>
+                        <div class="form-group">
+                            <select class="select-input" id="cfg-shape-mode">
+                                <option value="square" data-i18n="shapeSquare">⬜ Rectangle</option>
+                                <option value="circle" data-i18n="shapeCircle">⭕ Cercle / Ovale</option>
+                                <option value="hexagon" data-i18n="shapeHexagon">⬡ Hexagone</option>
+                                <option value="pentagon" data-i18n="shapePentagon">⬠ Pentagone</option>
+                                <option value="triangle" data-i18n="shapeTriangle">▲ Triangle</option>
+                                <option value="octagon" data-i18n="shapeOctagon">⬣ Octogone</option>
+                                <option value="custom" data-i18n="shapeCustom">✏️ Personnalise (dessiner)</option>
+                            </select>
+                        </div>
+                    </div>
+                        <div class="section-title"><i class="fas fa-mountain"></i> <span data-i18n="secRelief">Relief Procédural</span></div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelMinH">Hauteur Min</span> <span class="val-badge" id="val-min-h">1</span></label>
+                            <input type="range" id="cfg-min-h" min="1" max="100" value="1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelMaxH">Hauteur Max</span> <span class="val-badge" id="val-max-h">400</span></label>
+                            <input type="range" id="cfg-max-h" min="100" max="1000" value="400">
+                            <p id="max-h-warning" style="display: none; color: var(--accent-orange); font-size: 0.75rem; margin: 4px 0 0;" data-i18n="maxHWarning">⚠️ Au-delà de 400, l'export sera plus lourd et plus lent en jeu (déconseillé).</p>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelNoiseScale">Échelle Bruit</span> <span class="val-badge" id="val-noise-scale">0.008</span></label>
+                            <input type="range" id="cfg-noise-scale" min="0.002" max="0.03" step="0.001" value="0.008">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelIntensity">Intensité</span> <span class="val-badge" id="val-intensity">15</span></label>
+                            <input type="range" id="cfg-intensity" min="5" max="50" value="15">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelRoughness">Rugosité Crêtes</span> <span class="val-badge" id="val-roughness">0.65</span></label>
+                            <input type="range" id="cfg-roughness" min="0.1" max="1.5" step="0.05" value="0.65">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-folder-open"></i> <span data-i18n="secPresets">Presets & Actions</span></div>
+                        <div class="form-group">
+                            <select class="select-input" id="select-preset">
+                                <option value="" data-i18n="presetDefault">-- Choisir un Preset --</option>
+                            </select>
+                        </div>
+                        <div class="action-buttons" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <button class="btn btn-secondary" id="btn-undo" onclick="window.triggerUndo()" title="Annuler / Undo (Ctrl+Z)" style="flex: 1;"><i class="fas fa-undo-alt"></i> <span data-i18n="btnUndo">Annuler</span></button>
+                            <button class="btn btn-secondary" id="btn-redo" onclick="window.triggerRedo()" title="Rétablir / Redo (Ctrl+Y)" style="flex: 1;"><i class="fas fa-redo-alt"></i> <span data-i18n="btnRedo">Rétablir</span></button>
+                            <button class="btn btn-secondary" id="btn-reset" data-i18n="btnReset" style="flex: 1;"><i class="fas fa-trash-alt"></i> Reset</button>
+                            <button class="btn btn-secondary" id="btn-save-preset" data-i18n="btnSavePreset" style="flex: 1;"><i class="fas fa-save"></i> Sauver Preset</button>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-seedling"></i> <span data-i18n="secBiomes">Biomes (cliquer pour défaut)</span></div>
+                        <div class="biomes-grid" id="biomes-grid"></div>
+                    </div>
+                </div>
+
+                <!-- ONGLET 2 : ÉDITEUR -->
+                <div class="tab-panel" id="panel-editor">
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-palette"></i> <span data-i18n="secPalette">Palette Biomes (Peinture)</span></div>
+                        <div class="editor-biomes-grid" id="editor-biomes-grid"></div>
+                        <button class="btn btn-secondary" id="btn-add-palette" style="width: 100%; margin-top: 8px; font-size: 0.85rem;" data-i18n="btnAddPalette">➕ Ajouter ma palette de couleurs</button>
+                    </div>
+
+                    <!-- FORMULAIRE PALETTE PERSONNALISÉE -->
+                    <div class="form-section" id="palette-form" style="display: none; background: rgba(56, 189, 248, 0.06); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 12px;">
+                        <div class="section-title" style="color: var(--accent-cyan);"><i class="fas fa-palette"></i> <span data-i18n="secPaletteForm">Ma Palette Personnalisée</span></div>
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="labelPaletteName">Nom de la palette</label>
+                            <input type="text" class="input-text" id="palette-name" placeholder="Ma palette" maxlength="24">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="labelPaletteColor">Couleur (aperçu carte)</label>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="color" id="palette-color" value="#cc5de8" style="width: 46px; height: 34px; border: none; border-radius: 6px; background: none; cursor: pointer;">
+                                <input type="text" class="input-text" id="palette-color-hex" value="#cc5de8" style="flex: 1;">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" data-i18n="labelPaletteBlocks">Blocs Bloxd (séparés par des virgules)</label>
+                            <input type="text" class="input-text" id="palette-blocks" placeholder="Purple Wool, Purple Concrete, Amethyst">
+                            <p style="color: var(--text-muted); font-size: 0.75rem; margin: 4px 0 0;" data-i18n="paletteBlocksHint">Noms exacts des blocs (ex : Grass Block, Red Sand, Magma). Un bloc inconnu devient Grass Block à l'export.</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-export" id="btn-save-palette" style="flex: 1; padding: 8px;" data-i18n="btnSavePalette">💾 Enregistrer</button>
+                            <button class="btn btn-secondary" id="btn-cancel-palette" style="padding: 8px 14px;" data-i18n="btnCancelPalette">Annuler</button>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-tools"></i> <span data-i18n="secTools">Outils Peinture & Sculpture</span></div>
+                        <div class="tools-grid">
+                            <button class="tool-btn active" id="tool-biome" data-i18n="toolBiome" data-i18n-title="toolBiomeTitle" title="Peindre le biome">
+                                <i class="fas fa-paint-brush"></i><span>Brush Biome</span>
+                            </button>
+                            <button class="tool-btn" id="tool-raise" data-i18n="toolRaise" data-i18n-title="toolRaiseTitle" title="Élever">
+                                <i class="fas fa-chevron-up"></i><span>Élever (+)</span>
+                            </button>
+                            <button class="tool-btn" id="tool-lower" data-i18n="toolLower" data-i18n-title="toolLowerTitle" title="Creuser">
+                                <i class="fas fa-chevron-down"></i><span>Creuser (-)</span>
+                            </button>
+                            <button class="tool-btn" id="tool-smooth" data-i18n="toolSmooth" data-i18n-title="toolSmoothTitle" title="Lisser">
+                                <i class="fas fa-water"></i><span>Lisser</span>
+                            </button>
+                            <button class="tool-btn" id="tool-flatten" data-i18n="toolFlatten" data-i18n-title="toolFlattenTitle" title="Aplatir">
+                                <i class="fas fa-layer-group"></i><span>Aplatir</span>
+                            </button>
+                            <button class="tool-btn" id="tool-eraser" data-i18n="toolEraser" data-i18n-title="toolEraserTitle" title="Gomme">
+                                <i class="fas fa-eraser"></i><span>Gomme</span>
+                            </button>
+                            <button class="tool-btn" id="tool-sphere" data-i18n="toolSphere" data-i18n-title="toolSphereTitle" title="Poser une sphère (dôme) de terrain">
+                                <i class="fas fa-globe"></i><span>Sphère</span>
+                            </button>
+                            <button class="tool-btn" id="tool-box" data-i18n="toolBox" data-i18n-title="toolBoxTitle" title="Poser un pavé (plateau) de terrain">
+                                <i class="fas fa-cube"></i><span>Pavé</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PARAMÈTRES DE L'OUTIL APLATIR -->
+                    <div class="form-section" id="flatten-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 12px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                                <input type="checkbox" id="flatten-exact">
+                                <span data-i18n="labelFlattenExact" data-i18n-title="titleFlattenExact" title="Tout le cercle est mis exactement au niveau du premier clic (pas de fondu sur les bords).">Aplatir à 100% (niveau exact)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- PARAMÈTRES DES FORMES (sphère / pavé) -->
+                    <div class="form-section" id="stamp-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 12px;">
+                        <div class="section-title" style="color: var(--accent-purple);"><i class="fas fa-cube"></i> <span data-i18n="secStampParams">Taille de la Forme</span></div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelStampW">Largeur (X, en blocs)</span> <span class="val-badge" id="val-stamp-w">16</span></label>
+                            <input type="range" id="stamp-w" min="2" max="120" value="16">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelStampD">Profondeur (Z, en blocs)</span> <span class="val-badge" id="val-stamp-d">16</span></label>
+                            <input type="range" id="stamp-d" min="2" max="120" value="16">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelStampH">Hauteur (+bosse / -creux)</span> <span class="val-badge" id="val-stamp-h">20</span></label>
+                            <input type="range" id="stamp-h" min="-60" max="60" value="20">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
+                                <input type="checkbox" id="stamp-paint-biome" checked>
+                                <span data-i18n="labelStampBiome">Appliquer aussi le biome sélectionné</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-sliders-h"></i> <span data-i18n="secBrushParams">Paramètres du Brush</span></div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelBrushSize">Taille Pinceau</span> <span class="val-badge" id="val-brush-size">4 cases</span></label>
+                            <input type="range" id="brush-size" min="1" max="15" value="4">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><span data-i18n="labelBrushIntensity">Intensité</span> <span class="val-badge" id="val-brush-intensity">15</span></label>
+                            <input type="range" id="brush-intensity" min="1" max="40" value="15">
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style="padding: 16px 20px;">
+                <button class="btn btn-export" id="btn-download-project" data-i18n="btnDownloadZip">
+                    <i class="fas fa-file-export"></i> 👉 Télécharger le projet (ZIP)
+                </button>
+            </div>
+
+            <footer class="stats-bar">
+                <span class="stat-item"><span data-i18n="statMin">Min: </span><strong id="stat-min-h">1m</strong></span>
+                <span class="stat-item"><span data-i18n="statAvg">Moy: </span><strong id="stat-avg-h">70m</strong></span>
+                <span class="stat-item"><span data-i18n="statMax">Max: </span><strong id="stat-max-h">400m</strong></span>
+            </footer>
+        </aside>
+
+        <!-- SÉPARATEUR VERTICAL -->
+        <div id="splitter-vertical"></div>
+
+        <!-- ZONE CARTES DROITE -->
+        <main id="app-maps">
+            <section id="map2d-section">
+                <div class="map-view-switch">
+                    <button class="view-switch-btn active" id="btn-view-2d"><i class="fas fa-map"></i> <span data-i18n="title2D">Carte 2D Éditable</span></button>
+                    <button class="view-switch-btn" id="btn-view-3d"><i class="fas fa-cube"></i> <span data-i18n="title3D">Visualisation 3D</span></button>
+                </div>
+                <div class="map-controls-toolbar">
+                    <button class="toolbar-btn" id="btn-2d-reset" data-i18n="btn2dReset"><i class="fas fa-compress-arrows-alt"></i> Recadrer</button>
+                    <button class="toolbar-btn active" id="btn-2d-relief" data-i18n="btn2dRelief"><i class="fas fa-mountain"></i> Relief</button>
+                    <button class="toolbar-btn" id="btn-2d-grid" data-i18n="btn2dGrid"><i class="fas fa-th"></i> Grille</button>
+                </div>
+                <canvas id="map2d-canvas"></canvas>
+                <div id="map2d-info"><span class="info-badge" data-i18n="infoHover">Survolez la carte pour voir les coordonnées</span></div>
+            </section>
+
+            <section id="map3d-section" class="view-hidden">
+                <div class="map-view-switch">
+                    <button class="view-switch-btn" id="btn-view-2d-b"><i class="fas fa-map"></i> <span data-i18n="title2D">Carte 2D Éditable</span></button>
+                    <button class="view-switch-btn active" id="btn-view-3d-b"><i class="fas fa-cube"></i> <span data-i18n="title3D">Visualisation 3D</span></button>
+                </div>
+                <div class="map-controls-toolbar">
+                    <button class="toolbar-btn" id="btn-3d-reset" data-i18n="btn3dReset"><i class="fas fa-video"></i> Caméra</button>
+                    <button class="toolbar-btn" id="btn-3d-mesh">🧱 Voxel</button>
+                    <button class="toolbar-btn active" id="btn-3d-water" data-i18n="btn3dWater"><i class="fas fa-water"></i> Eau</button>
+                    <span class="fly-hint" data-i18n="flyHint" style="margin-left:auto;font-size:0.72rem;color:var(--text-muted);align-self:center;white-space:nowrap;">🎮 ZQSD + Espace/Ctrl pour voler</span>
+                </div>
+                <div id="map3d-container"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modale d'Exportation -->
+    <div class="modal-overlay" id="export-modal">
+        <div class="modal-box">
+            <header class="modal-header">
+                <div class="modal-title"><i class="fas fa-file-code" style="color: var(--accent-cyan);"></i> <span data-i18n="modalTitle">Exportation du Projet Bloxd</span></div>
+                <button class="close-btn" id="btn-close-modal"><i class="fas fa-times"></i></button>
+            </header>
+            <div class="modal-body">
+                <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;" data-i18n="modalDesc">
+                    Téléchargez directement votre <strong>schématique (.bloxdschem)</strong> généré en temps réel sans avoir besoin de Python ni de ligne de commande ! Si le monde est trop grand, il sera automatiquement découpé en plusieurs fichiers regroupés dans un dossier ZIP.
+                </p>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="modalFilenameLabel">Nom du fichier <span style="color: var(--text-muted); font-weight: 400;">(si un seul schéma)</span></label>
+                    <input type="text" class="input-text" id="export-filename" placeholder="monde_personnalise" value="monde_personnalise">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="modalFoldernameLabel">Nom du dossier <span style="color: var(--text-muted); font-weight: 400;">(si plusieurs schémas)</span></label>
+                    <input type="text" class="input-text" id="export-foldername" placeholder="schematics_decoupes" value="schematics_decoupes">
+                    <p style="color: var(--text-muted); font-size: 0.78rem; margin: 6px 0 0;" data-i18n="modalFolderDesc">
+                        Chaque schéma du dossier sera nommé <code>numéro_[posX,posY,posZ]</code> (ex : <code>1_[0,0,0]</code>).
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" data-i18n="modalAnchorLabel">Position de l'angle de collage <span style="color: var(--text-muted); font-weight: 400;">(coin où vous poserez le 1er schéma en jeu)</span></label>
+                    <div class="form-grid-2" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                        <input type="number" class="input-text" id="export-anchor-x" placeholder="X" value="0" step="1">
+                        <input type="number" class="input-text" id="export-anchor-y" placeholder="Y" value="0" step="1">
+                        <input type="number" class="input-text" id="export-anchor-z" placeholder="Z" value="0" step="1">
+                    </div>
+                </div>
+
+                <div class="form-group" style="background: rgba(139, 92, 246, 0.08); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 10px 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="export-pixelated">
+                        <span style="font-weight: 600;" data-i18n="modalPixelated">🧊 Style pixelisé (gros blocs texturés)</span>
+                    </label>
+                    <p style="color: var(--text-muted); font-size: 0.78rem; margin: 6px 0 0 24px;" data-i18n="modalPixelatedDesc">
+                        Conserve l'effet "marches géantes" : le terrain est exporté en gros plateaux cubiques stylés. Décoché = pentes lissées (interpolation).
+                    </p>
+                </div>
+
+                <div class="form-group" style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--accent-green); border-radius: 8px; padding: 10px 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="export-single-file">
+                        <span style="font-weight: 600;" data-i18n="modalSingleFile">📄 Forcer un seul fichier .bloxdschem</span>
+                    </label>
+                    <p style="color: var(--text-muted); font-size: 0.78rem; margin: 6px 0 0 24px;" data-i18n="modalSingleFileDesc">
+                        Exporte tout le monde en un unique schématique, sans découpage. Idéal pour les outils externes (autres sites web). ⚠️ Bloxd.io refusera ce fichier s'il dépasse ~200 chunks : garde la case décochée pour importer en jeu.
+                    </p>
+                </div>
+            </div>
+            <footer class="modal-footer">
+                <button class="btn btn-export" id="btn-do-download-zip" style="width: auto;" data-i18n="modalDownloadBtn">
+                    <i class="fas fa-download"></i> Télécharger le fichier .bloxdschem
+                </button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         Librairies et modules chargés depuis les fichiers externes
+         terrain_editor_*.js présents dans le même dossier.
+         L'ordre des <script> ci-dessous est IMPORTANT (dépendances).
+         Moteur 3D : BABYLON.JS (v3.5+ — auparavant Three.js).
+         v3.6 : terrain chunkisé (frustum culling par chunk, ombres
+         render-once, maj locales smooth+voxel, build progressif autour
+         du point regardé, matériaux figés, chunks 100% couverts désactivés).
+         ============================================================ -->
+
+    <script src="terrain_editor_babylon.min.js"></script>
+    <!-- Code propre + JSZip (fusionné) -->
+    <script src="terrain_editor.js"></script>
+</body>
+</html>
