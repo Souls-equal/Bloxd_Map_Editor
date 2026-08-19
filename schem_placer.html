@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloxd Tools — Schem Placer v4.3.0</title>
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAOVBMVEVHcEwAAAA9pNs4m9EijslFreYwk8k2mc/S1tkrVrMohLU4jLrm5ubc3d7Z2dnMzMzo6OjW1tbr6+vyK7X2AAAAAXRSTlMAQObYZgAAAHZJREFUGNONz0sOwyAMBNDMjG0I+ff+h62hUaVWXdSCxTxsyUzTjwLwmSkOuh9AS0iCyOEyRQYzyhwDTPDYj2PZegvoHR5hUf0FyHOGVXezDnDPe3pdJHUorRXYVq913cdIm+cC0hVcYnRkzkHq3u+94PcP/q4nWJ8CdE2R79EAAAAASUVORK5CYII=">
+    <link rel="stylesheet" href="schem_placer.css">
+</head>
+<body>
+<div id="app">
+    <!-- Vue 3D plein écran -->
+    <div id="viewport">
+        <canvas id="babylon-canvas"></canvas>
+
+        <!-- Barre d'outils -->
+        <div id="topbar">
+            <div class="topbar-left">
+                <a class="tbtn" href="index.html" title="⌂ Menu principal"><span class="ic">🏠</span></a>
+                <button class="tbtn" id="btn-open" title="Charger fichier(s) — Ctrl+O"><span class="ic">📂</span> <span data-i18n="open">Ouvrir</span></button>
+                <button class="tbtn" id="btn-export" title="Exporter — Ctrl+E"><span class="ic">💾</span> <span data-i18n="export">Exporter</span></button>
+                <button class="tbtn" id="btn-save-preset" title="Sauvegarder un preset dans le navigateur"><span class="ic">⭐</span></button>
+                <div id="preset-wrap">
+                    <button class="tbtn" id="btn-load-preset" title="Charger un preset sauvegardé"><span class="ic">📁</span></button>
+                    <div id="preset-menu"></div>
+                </div>
+                <span class="tbtn-sep"></span>
+                <button class="tbtn active" id="mode-select" data-mode="select" title="Mode Sélection / Déplacement à la souris (V)"><span class="ic">🖱️</span> <span data-i18n="mode_select">Souris</span></button>
+                <button class="tbtn" id="mode-move"   data-mode="move"   title="Mode Déplacement (G) — flèches 6 directions"><span class="ic">↔️</span> <span data-i18n="mode_move">Déplacer</span></button>
+                <button class="tbtn" id="mode-scale"  data-mode="scale"  title="Mode Séparer/Redimensionner (T) — poignées 6 directions"><span class="ic">✂️</span> <span data-i18n="mode_scale">Séparer</span></button>
+                <button class="tbtn" id="mode-multi"   data-mode="multi"  title="Mode Multi-sélection (M)"><span class="ic">🔲</span> <span data-i18n="mode_multi">Multi</span></button>
+                <span class="tbtn-sep"></span>
+                <button class="tbtn" id="btn-duplicate" title="Dupliquer le sélectionné (Ctrl+D)"><span class="ic">📑</span></button>
+                <button class="tbtn danger" id="btn-delete" title="Supprimer le sélectionné (Suppr)"><span class="ic">🗑️</span></button>
+                <button class="tbtn" id="btn-focus" title="Recentrer la caméra (F)"><span class="ic">🎯</span></button>
+            </div>
+            <div class="topbar-right">
+                <button class="tbtn danger" id="btn-clear" title="Vider la scène"><span class="ic">🧹</span> <span data-i18n="clear">Vider</span></button>
+            </div>
+        </div>
+        <input id="file-input" type="file" accept=".bloxdschem,.schem,.bin,.zip" multiple>
+
+        <!-- Indicateur de mode -->
+        <div id="mode-indicator"></div>
+
+        <!-- Panneau inspecteur -->
+        <div id="inspector">
+            <h3 id="sel-name">—</h3>
+            <div class="info-row"><span class="k" data-i18n="dim">Dimensions</span><span class="v" id="sel-size">—</span></div>
+            <div class="info-row"><span class="k" data-i18n="pos">Position</span><span class="v" id="sel-pos">—</span></div>
+            <div class="info-row"><span class="k" data-i18n="blocks">Blocs</span><span class="v" id="sel-blocks">—</span></div>
+            <div class="info-row"><span class="k" data-i18n="color">Couleur</span><span class="v"><input type="color" id="sel-color"></span></div>
+            <div class="step-row">
+                <label><span data-i18n="step">Pas :</span> <span class="step-val" id="step-val">1</span> <span data-i18n="blocks_unit">bloc(s)</span></label>
+                <input id="step-slider" type="range" min="1" max="64" value="1">
+                <span class="small" data-i18n="shift_hint" style="color:var(--muted); font-size:10.5px;">Maintenir Maj pour ×10</span>
+            </div>
+            <div class="btn-row">
+                <button class="tbtn small" id="btn-rename" data-i18n="rename">Renommer</button>
+            </div>
+        </div>
+
+        <!-- Liste des schems en bas à gauche -->
+        <div id="schem-panel">
+            <div id="schem-header">
+                <h3 data-i18n="schems">Schems</h3>
+                <span id="schem-count">0</span>
+                <span id="schem-toggle">▼</span>
+            </div>
+            <div id="schem-list-inner">
+                <div id="no-schem-msg" class="muted"><span data-i18n="no_schem">Aucun schem. Glissez-déposez ou</span> <span id="open-hint" data-i18n="open_hint" style="color:var(--accent); cursor:pointer;">cliquez sur Ouvrir</span>.</div>
+            </div>
+        </div>
+
+        <!-- Gizmo flèches (mode Déplacer) -->
+        <div id="gizmo">
+            <svg id="gizmo-svg" xmlns="http://www.w3.org/2000/svg">
+                <g class="gaxis" data-axis="x"><line class="ghit"/><line class="gshaft"/><polygon class="ghead"/></g>
+                <g class="gaxis" data-axis="y"><line class="ghit"/><line class="gshaft"/><polygon class="ghead"/></g>
+                <g class="gaxis" data-axis="z"><line class="ghit"/><line class="gshaft"/><polygon class="ghead"/></g>
+            </svg>
+        </div>
+
+        <!-- Barre du mode Séparer -->
+        <div id="cut-toolbar">
+            <div class="cut-title" data-i18n="cut_title">✂️ Séparer</div>
+            <div class="cut-row">
+                <span id="cut-face-label" style="color:#ffb020;font-size:11px;flex:1;text-align:center;"></span>
+            </div>
+            <div class="cut-row">
+                <button class="tbtn primary small" id="btn-cut-extract"><span data-i18n="cut_extract">✂️ Couper</span></button>
+                <button class="tbtn small" id="btn-cut-copy"><span data-i18n="cut_copy">📑 Dupliquer</span></button>
+                <button class="tbtn small danger" id="btn-cut-cancel">✕</button>
+            </div>
+        </div>
+
+        <!-- Barre du mode Multi-sélection -->
+        <div id="multi-toolbar">
+            <div class="cut-title"><span data-i18n="multi_title">🔲 Multi-sélection —</span> <span id="multi-count">0</span> <span data-i18n="schems_word">schem(s)</span></div>
+            <div class="cut-row">
+                <button class="tbtn primary small" id="btn-multi-union"><span data-i18n="multi_union">🔗 Unir</span></button>
+                <button class="tbtn small" id="btn-multi-split"><span data-i18n="multi_split">✂️ Désunir</span></button>
+                <button class="tbtn small success" id="btn-multi-export"><span data-i18n="multi_export">💾 Exporter</span></button>
+                <button class="tbtn small danger" id="btn-multi-cancel">✕</button>
+            </div>
+        </div>
+
+        <!-- Drag & drop overlay -->
+        <div id="drop-overlay"><div class="drop-msg" data-i18n="drop_msg">📥 Déposez vos .bloxdschem ou un .zip ici</div></div>
+
+        <!-- Modale d'export -->
+        <div id="export-modal" class="modal-mask">
+            <div class="modal-box">
+                <h3 data-i18n="export_title">💾 Exporter</h3>
+                <div class="export-info" id="export-info"></div>
+                <div class="form-row">
+                    <label><span data-i18n="export_base">Nom de base</span>
+                        <input type="text" id="export-name" value="monde">
+                    </label>
+                </div>
+                <div class="form-row">
+                    <label><span data-i18n="export_folder">Dossier dans le zip</span>
+                        <input type="text" id="export-folder" value="schematics">
+                    </label>
+                </div>
+                <div class="form-row inline">
+                    <label class="chk"><input type="checkbox" id="export-coords" checked> <span data-i18n="export_coords">Ajouter les coordonnées _x…_z… dans les noms</span></label>
+                </div>
+                <div class="form-row inline">
+                    <label class="chk"><input type="checkbox" id="export-single"> <span data-i18n="export_single">Forcer un seul fichier</span></label>
+                </div>
+                <div class="form-row">
+                    <div id="export-mode-hint" class="small"></div>
+                </div>
+                <div class="modal-buttons">
+                    <button class="tbtn" id="btn-export-cancel" data-i18n="cancel">Annuler</button>
+                    <button class="tbtn primary" id="btn-export-go"><span data-i18n="download">📦 Télécharger</span></button>
+                </div>
+            </div>
+        </div>
+        <!-- Modale d'export multi (fusion vs séparés) -->
+        <div id="multi-export-modal" class="modal-mask">
+            <div class="modal-box" style="min-width:400px;">
+                <h3 data-i18n="me_title">💾 Exporter la sélection</h3>
+                <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">
+                    <button class="tbtn primary" id="btn-me-single" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
+                        <span data-i18n="me_single">📄 Un seul schem</span>
+                        <div class="small" data-i18n="me_single_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Tous les schems fusionnés en UN seul .bloxdschem (jamais découpé)</div>
+                    </button>
+                    <button class="tbtn" id="btn-me-separate" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
+                        <span data-i18n="me_separate">📑 Plusieurs schems (séparés)</span>
+                        <div class="small" data-i18n="me_separate_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Chaque schem téléchargé séparément dans un .zip</div>
+                    </button>
+                    <button class="tbtn" id="btn-me-autosplit" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
+                        <span data-i18n="me_autosplit">✂️ Fusion + découpe auto</span>
+                        <div class="small" data-i18n="me_autosplit_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Fusionne tout, puis découpe en ZIP si > 160 chunks (limite Bloxd)</div>
+                    </button>
+                </div>
+                <div class="modal-buttons"><button class="tbtn" id="btn-me-cancel" data-i18n="cancel">Annuler</button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barre de statut en bas -->
+    <div id="statusbar">
+        <span id="status-text">Prêt.</span>
+        <span class="spacer" style="flex:1"></span>
+        <span class="coord"><span data-i18n="cam_label">Cam:</span> <b id="cam-coord">—</b></span>
+        <span class="coord"><span data-i18n="step_label">Pas:</span> <b id="step-readout">1</b></span>
+    </div>
+</div>
+
+<!-- Scripts Babylon.js -->
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="schem_placer-babylon.js"></script>
+<script src="schem_placer.js"></script>
+</body>
+</html>

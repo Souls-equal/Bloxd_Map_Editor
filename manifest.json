@@ -1,0 +1,8 @@
+{
+  "schematics": [
+    { "prefix": "tree",  "from": 1, "to": 999, "pad": 3, "type": "tree" },
+    { "prefix": "house", "from": 1, "to": 999, "pad": 3, "type": "house" },
+    { "prefix": "rock",  "from": 1, "to": 999, "pad": 3, "type": "rock" },
+    { "prefix": "stand", "from": 1, "to": 999, "pad": 3, "type": "stand" }
+  ]
+}
