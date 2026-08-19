@@ -174,6 +174,107 @@ body {
     background: #e05555;
 }
 
+/* --- Séparateur de toolbar --- */
+.toolbar-sep {
+    width: 1px;
+    height: 22px;
+    background: #3b435b;
+    margin: 0 2px;
+    flex: 0 0 auto;
+}
+
+/* --- Menu déroulant Session (save/load scene) --- */
+.toolbar-dropdown {
+    position: relative;
+}
+.toolbar-dropdown .caret {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-left: 3px;
+}
+.toolbar-dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 226px;
+    background: #222633;
+    border: 1px solid #3b435b;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+    padding: 6px;
+    z-index: 200;
+    pointer-events: auto;
+}
+.toolbar-dropdown-menu.open {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.dd-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 10px;
+    margin: 0;
+    background: transparent;
+    color: #eef2f8;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    white-space: nowrap;
+}
+.dd-item:hover {
+    background: rgba(74, 168, 255, 0.16);
+}
+.dd-item .dd-ico {
+    flex: 0 0 auto;
+    width: 18px;
+    text-align: center;
+}
+.dd-item.danger {
+    color: #e08585;
+}
+.dd-item.danger:hover {
+    background: rgba(224, 85, 85, 0.16);
+}
+.dd-sep {
+    height: 1px;
+    background: #3b435b;
+    margin: 4px 6px;
+}
+
+/* --- Toast (notification temporaire) --- */
+.scene-toast {
+    position: fixed;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%) translateY(18px);
+    background: #222633;
+    color: #eef2f8;
+    border: 1px solid #3b435b;
+    border-left: 3px solid #4aa8ff;
+    border-radius: 8px;
+    padding: 11px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 5000;
+    max-width: 80vw;
+}
+.scene-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+.scene-toast.success { border-left-color: #2f9e44; }
+.scene-toast.error   { border-left-color: #e05555; }
+
 /* --- Sidebar Gauche Bibliothèque (overlay, 2 par rangée) --- */
 .left-sidebar {
     position: fixed;
