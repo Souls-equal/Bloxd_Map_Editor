@@ -33,6 +33,22 @@ window.LibraryUI = class LibraryUI {
                 <div class="toolbar-left">
                     <button id="btn-import-terrain" class="ui-btn"><span data-i18n="importTerrain">🌄 Import (Terrain)</span></button>
                     <input id="input-import-terrain" type="file" accept=".bloxdschem,.json,.schem" style="display:none">
+                    <span class="toolbar-sep"></span>
+                    <div id="scene-menu-wrap" class="toolbar-dropdown">
+                        <button id="btn-scene-menu" class="ui-btn"><span data-i18n="sessionMenu">💾 Session</span> <span class="caret">▾</span></button>
+                        <div id="scene-dropdown" class="toolbar-dropdown-menu">
+                            <button class="dd-item" data-action="save"><span class="dd-ico">💾</span><span data-i18n="saveSession">Save (browser)</span></button>
+                            <button class="dd-item" data-action="load"><span class="dd-ico">📂</span><span data-i18n="loadSession">Load (browser)</span></button>
+                            <div class="dd-sep"></div>
+                            <button class="dd-item" data-action="export"><span class="dd-ico">⬇️</span><span data-i18n="exportScene">Export scene (.json)</span></button>
+                            <button class="dd-item" data-action="import"><span class="dd-ico">⬆️</span><span data-i18n="importScene">Import scene (.json)</span></button>
+                            <div class="dd-sep"></div>
+                            <button class="dd-item danger" data-action="clear-all"><span class="dd-ico">🗑️</span><span data-i18n="clearAllAssets">Clear all assets</span></button>
+                            <button class="dd-item danger" data-action="delete-save"><span class="dd-ico">🧹</span><span data-i18n="deleteSave">Delete saved session</span></button>
+                        </div>
+                    </div>
+                    <input id="input-import-scene" type="file" accept=".json,application/json" style="display:none">
+                    <span class="toolbar-sep"></span>
                     <button id="btn-export-single" class="ui-btn primary"><span data-i18n="export">📤 Export (Schematic)</span></button>
                 </div>
                 <div class="toolbar-right">
@@ -118,6 +134,9 @@ window.LibraryUI = class LibraryUI {
             if (window.appExporter) window.appExporter.exportSingleSchem();
         });
 
+        // === Menu Session : sauvegarde / restauration des positions d'assets ===
+        this._bindSessionMenu();
+
         // Recherche par nom
         const tagSearch = document.getElementById('asset-tag-search');
         tagSearch.addEventListener('input', () => {
@@ -146,6 +165,81 @@ window.LibraryUI = class LibraryUI {
             tagSearch.value = '';
             if (smb) smb.value = ''; if (sw) sw.value = ''; if (sh) sh.value = ''; if (sd) sd.value = '';
             this.populateLibrary();
+        });
+    }
+
+    // Texte traduit avec remplacement de paramètres {n}, {total}…
+    _t(key, params) {
+        let s = window.I18N.t(key);
+        if (params) for (const k in params) s = s.split('{' + k + '}').join(params[k]);
+        return s;
+    }
+
+    _bindSessionMenu() {
+        const sceneMenu = document.getElementById('btn-scene-menu');
+        const sceneDropdown = document.getElementById('scene-dropdown');
+        const setOpen = (open) => sceneDropdown.classList.toggle('open', open);
+        if (!sceneMenu || !sceneDropdown) return;
+
+        sceneMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setOpen(!sceneDropdown.classList.contains('open'));
+        });
+        document.addEventListener('click', () => setOpen(false));
+        sceneDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+        const SM = window.SceneManager;
+        const mgr = () => window.appSceneManager;
+
+        sceneDropdown.addEventListener('click', (e) => {
+            const item = e.target.closest('.dd-item');
+            if (!item) return;
+            const action = item.getAttribute('data-action');
+            setOpen(false);
+            const m = mgr();
+            if (!m) return;
+
+            if (action === 'save') {
+                const n = m.serialize().instances.length;
+                if (n === 0) { SM.toast(this._t('noAssetsToSave'), 'error'); return; }
+                m.saveToLocal();
+                SM.toast(this._t('sessionSaved', { n }), 'success');
+            } else if (action === 'load') {
+                if (m.countLocalSave() === 0) { SM.toast(this._t('noSavedSession'), 'error'); return; }
+                if (m.assetManager.instances.length > 0 && !confirm(this._t('confirmLoad'))) return;
+                const n = m.loadFromLocal();
+                SM.toast(this._t('sessionLoaded', { n }), 'success');
+            } else if (action === 'export') {
+                m.exportFile();
+            } else if (action === 'import') {
+                document.getElementById('input-import-scene').click();
+            } else if (action === 'clear-all') {
+                if (m.assetManager.instances.length === 0) { SM.toast(this._t('noAssetsToSave'), 'error'); return; }
+                if (!confirm(this._t('confirmClearAll'))) return;
+                m.clearInstances();
+                m.saveToLocal();
+                SM.toast(this._t('sceneCleared'), 'success');
+            } else if (action === 'delete-save') {
+                if (!confirm(this._t('confirmDeleteSave'))) return;
+                m.clearLocal();
+                SM.toast(this._t('saveDeleted'), 'success');
+            }
+        });
+
+        document.getElementById('input-import-scene').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            e.target.value = '';
+            if (!file) return;
+            const m = mgr();
+            if (!m) return;
+            try {
+                if (m.assetManager.instances.length > 0 && !confirm(this._t('confirmLoad'))) return;
+                const n = await m.importFile(file);
+                SM.toast(this._t('sceneImported', { n }), 'success');
+            } catch (err) {
+                console.error('[SceneManager] import error:', err);
+                SM.toast(this._t('sceneImportError'), 'error');
+            }
         });
     }
 
