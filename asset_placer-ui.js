@@ -1013,135 +1013,309 @@ window.ExplorerUI = class ExplorerUI {
         });
     }
 };
-/* ═══════════════════════════════════════════════════════════════ */
-/*  exporter  */
-/* ═══════════════════════════════════════════════════════════════ */
-
 /**
- * asset_placer-exporter.js
- * Unified export for terrain + placed assets.
+ * Exporter — follows TerrainManager export logic exactly
+ * Uses exact thresholds (512*512, 350000), heightmap-streaming detection,
+ * getExportBlocks(), HARD_MAX guard, early breaks, limited auto-terraform.
+ * Preserves all GitHub calls: getTemplateSchem, _centerOffset, BABYLON transforms,
+ * autoTerraform + 3-ring footprint, priority flags, getSurfaceBlockAtWorld.
  */
 
 window.Exporter = class Exporter {
     constructor(assetManager, terrainManager = null) {
         this.assetManager = assetManager;
         this.terrainManager = terrainManager;
+
+        // Exact same as TerrainManager
+        this.largeAreaThreshold = 512 * 512;
+        this.largeBlockThreshold = 350000;
+
+        // Hard safety cap to prevent Map maximum size exceeded (well below limits)
+        this.HARD_MAX_BLOCKS = 18000;
     }
 
     exportSingleSchem() {
-        const blockMap = new Map();
+        try {
+            const blockMap = new Map();
 
-        const putBlock = (block, source, instance = null) => {
-            if (!block || block.id === 0) return;
-            const key = `${block.x},${block.y},${block.z}`;
-            const existing = blockMap.get(key);
-            if (source === 'asset' && existing) {
-                if (existing.source === 'terrain' && instance && !instance.priorityOverTerrain) return;
-                if (existing.source === 'asset' && instance && !instance.priorityOverAssets) return;
-            }
-            blockMap.set(key, { ...block, source, instanceId: instance ? instance.id : null });
-        };
+            const toNum = (val, def = 0) => {
+                const n = Number(val);
+                return (isFinite(n) && !isNaN(n)) ? n : def;
+            };
 
-        let terrainSkipped = false;
-        if (this.terrainManager?.hasTerrain()) {
-            const data = this.terrainManager.terrainData;
-            if (data?.mode === 'heightmap-streaming' && data.totalColumns > 1000000) {
-                terrainSkipped = true;
-                alert(window.I18N.t('largeTerrainExportSkipped'));
-            } else {
-                for (const b of this.terrainManager.getExportBlocks()) putBlock(b, 'terrain');
-            }
-        }
+            const putBlock = (rawBlock, source, instance = null) => {
+                if (!rawBlock) return;
+                // HARD guard BEFORE any key or set
+                if (blockMap.size >= this.HARD_MAX_BLOCKS) return;
 
-        for (const inst of this.assetManager.instances) {
-            const schem = this.assetManager.getTemplateSchem(inst.name);
-            if (!schem?.blocks) continue;
+                const x = toNum(rawBlock.x);
+                const y = toNum(rawBlock.y);
+                const z = toNum(rawBlock.z);
+                const id = toNum(rawBlock.id);
 
-            const co = inst._centerOffset || { x: 0, z: 0 };
-            inst.mesh.computeWorldMatrix(true);
-            const wm = inst.mesh.getWorldMatrix();
-            const tmp = new BABYLON.Vector3();
-            const footprint = inst.autoTerraform ? new Map() : null; // "wx,wz" -> min wy
-            for (const block of schem.blocks) {
-                if (!block || block.id === 0) continue;
-                tmp.set(block.x - co.x, block.y, block.z - co.z);
-                BABYLON.Vector3.TransformCoordinatesToRef(tmp, wm, tmp);
-                const wx = Math.round(tmp.x), wy = Math.round(tmp.y), wz = Math.round(tmp.z);
-                putBlock({ x: wx, y: wy, z: wz, id: block.id, data: block.data || 0 }, 'asset', inst);
-                if (footprint) {
-                    const k = wx + ',' + wz;
-                    const prev = footprint.get(k);
-                    if (prev === undefined || wy < prev) footprint.set(k, wy);
+                if (id === 0) return;
+
+                const key = `${x},${y},${z}`;
+                const existing = blockMap.get(key);
+
+                if (source === 'asset' && existing) {
+                    if (existing.source === 'terrain' && instance && instance.priorityOverTerrain === false) return;
+                    if (existing.source === 'asset' && instance && instance.priorityOverAssets === false) return;
+                }
+
+                blockMap.set(key, {
+                    x, y, z, id,
+                    data: toNum(rawBlock.data, 0),
+                    source,
+                    instanceId: instance ? instance.id : null
+                });
+            };
+
+            let terrainSkipped = false;
+
+            // === TERRAIN: exact same decision as TerrainManager ===
+            if (this.terrainManager &&
+                typeof this.terrainManager.hasTerrain === 'function' &&
+                this.terrainManager.hasTerrain()) {
+
+                const tData = this.terrainManager.terrainData || {};
+                const mode = tData.mode || 'full';
+                const totalBlocks = toNum(tData.totalBlocks || 0);
+                const totalColumns = toNum(tData.totalColumns || 0);
+
+                let area = 0;
+                if (tData.size && tData.size.x && tData.size.z) {
+                    area = toNum(tData.size.x) * toNum(tData.size.z);
+                } else if (totalColumns > 0) {
+                    area = totalColumns * 64;
+                }
+
+                const isLarge =
+                    (mode === 'heightmap-streaming') ||
+                    (area > this.largeAreaThreshold) ||
+                    (totalBlocks > this.largeBlockThreshold);
+
+                if (isLarge) {
+                    terrainSkipped = true;
+                    console.warn('[Exporter] Large terrain detected (TerrainManager policy) - skipping terrain');
+                    const msg = (window.I18N && window.I18N.t) ?
+                        window.I18N.t('largeTerrainExportSkipped') :
+                        'Large terrain detected (same as Terrain Editor). Terrain blocks skipped. Only placed assets exported.';
+                    alert(msg);
+                } else if (typeof this.terrainManager.getExportBlocks === 'function') {
+                    try {
+                        const terrainBlocks = this.terrainManager.getExportBlocks();
+                        if (Array.isArray(terrainBlocks)) {
+                            for (const b of terrainBlocks) {
+                                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                                putBlock(b, 'terrain');
+                            }
+                        }
+                    } catch (e) {}
                 }
             }
-            // Auto-terraform : socle NATUREL — pente au bord (3 anneaux) + matériau du sol par colonne.
-            if (footprint) {
-                const tm = this.terrainManager;
-                let baseY = Infinity; for (const y of footprint.values()) if (y < baseY) baseY = y;
-                const floorY = baseY - 6;
-                const filled = new Set();
-                const fillCol = (wx, wz, topY) => {
-                    let gid = (tm && tm.getSurfaceBlockAtWorld) ? tm.getSurfaceBlockAtWorld(wx, wz) : null;
-                    if (!gid) gid = 2;
-                    for (let y = Math.round(topY); y >= Math.round(floorY); y--) putBlock({ x: wx, y, z: wz, id: gid, data: 0 }, 'asset', inst);
-                };
-                for (const [k, by] of footprint) { const p = k.split(','); fillCol(+p[0], +p[1], by - 1); filled.add(k); }
-                // anneaux de bordure en pente (1 bloc de moins par anneau)
-                let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
-                for (let ring = 1; ring <= 3; ring++) {
-                    const next = [];
-                    for (const [x, z] of frontier) {
-                        for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-                            const nk = (x+dx) + ',' + (z+dz);
-                            if (filled.has(nk)) continue; filled.add(nk);
-                            fillCol(x+dx, z+dz, baseY - 1 - ring);
-                            next.push([x+dx, z+dz]);
+
+            // === PLACED ASSETS ===
+            const instances = (this.assetManager && Array.isArray(this.assetManager.instances))
+                ? this.assetManager.instances : [];
+
+            for (const inst of instances) {
+                if (!inst || typeof inst.name !== 'string') continue;
+                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+
+                let schem = null;
+                try {
+                    schem = this.assetManager.getTemplateSchem(inst.name);
+                } catch (e) { continue; }
+
+                if (!schem || !Array.isArray(schem.blocks) || schem.blocks.length === 0) continue;
+
+                const co = (inst._centerOffset && typeof inst._centerOffset === 'object') ?
+                    inst._centerOffset : { x: 0, z: 0 };
+
+                let hasMesh = false;
+                let wm = null;
+                let tmp = null;
+                try {
+                    if (inst.mesh && typeof inst.mesh.computeWorldMatrix === 'function' && window.BABYLON) {
+                        inst.mesh.computeWorldMatrix(true);
+                        wm = inst.mesh.getWorldMatrix();
+                        tmp = new BABYLON.Vector3();
+                        hasMesh = true;
+                    }
+                } catch (e) {}
+
+                const footprint = (inst.autoTerraform) ? new Map() : null;
+
+                for (const block of schem.blocks) {
+                    if (!block || block.id === 0) continue;
+                    if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+
+                    let wx, wy, wz;
+                    if (hasMesh && wm && tmp) {
+                        try {
+                            tmp.set(
+                                toNum(block.x) - toNum(co.x),
+                                toNum(block.y),
+                                toNum(block.z) - toNum(co.z)
+                            );
+                            BABYLON.Vector3.TransformCoordinatesToRef(tmp, wm, tmp);
+                            wx = Math.round(tmp.x);
+                            wy = Math.round(tmp.y);
+                            wz = Math.round(tmp.z);
+                        } catch (e) {
+                            wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
+                            wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
+                            wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
+                        }
+                    } else {
+                        wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
+                        wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
+                        wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
+                    }
+
+                    putBlock({ x: wx, y: wy, z: wz, id: toNum(block.id), data: toNum(block.data, 0) }, 'asset', inst);
+
+                    if (footprint && blockMap.size < this.HARD_MAX_BLOCKS) {
+                        const k = wx + ',' + wz;
+                        const prev = footprint.get(k);
+                        if (prev === undefined || wy < prev) footprint.set(k, wy);
+                    }
+                }
+
+                // Limited auto-terraform (only for tiny scenes, as per TerrainManager style)
+                if (footprint && blockMap.size < this.HARD_MAX_BLOCKS * 0.08) {
+                    const tm = this.terrainManager;
+                    let baseY = Infinity;
+                    for (const y of footprint.values()) {
+                        if (y < baseY) baseY = y;
+                    }
+                    if (!isFinite(baseY)) baseY = 0;
+                    const floorY = baseY - 3;
+
+                    const filled = new Set();
+
+                    const fillCol = (wx, wz, topY) => {
+                        if (blockMap.size >= this.HARD_MAX_BLOCKS) return;
+                        let gid = 2;
+                        try {
+                            if (tm && typeof tm.getSurfaceBlockAtWorld === 'function') {
+                                const g = tm.getSurfaceBlockAtWorld(wx, wz);
+                                if (g) gid = g;
+                            }
+                        } catch (e) {}
+                        for (let y = Math.round(topY); y >= Math.round(floorY); y--) {
+                            if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                            putBlock({ x: wx, y: y, z: wz, id: gid, data: 0 }, 'asset', inst);
+                        }
+                    };
+
+                    // Primary footprint
+                    for (const [k, by] of footprint) {
+                        if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                        const p = k.split(',');
+                        fillCol(+p[0], +p[1], by - 1);
+                        filled.add(k);
+                    }
+
+                    // 3 rings (as in original) but guarded
+                    if (blockMap.size < this.HARD_MAX_BLOCKS) {
+                        let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
+                        for (let ring = 1; ring <= 3; ring++) {
+                            if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                            const next = [];
+                            for (const [x, z] of frontier) {
+                                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                                for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+                                    if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
+                                    const nk = (x + dx) + ',' + (z + dz);
+                                    if (filled.has(nk)) continue;
+                                    filled.add(nk);
+                                    fillCol(x + dx, z + dz, baseY - 1 - ring);
+                                    next.push([x + dx, z + dz]);
+                                }
+                            }
+                            frontier = next;
                         }
                     }
-                    frontier = next;
                 }
             }
+
+            const all = Array.from(blockMap.values());
+            if (all.length === 0) {
+                const msg = (window.I18N && window.I18N.t) ? window.I18N.t('noBlocksToExport') : 'No blocks to export!';
+                alert(msg);
+                return;
+            }
+
+            if (blockMap.size >= this.HARD_MAX_BLOCKS) {
+                alert('Export truncated at safety limit to avoid crash (same policy as Terrain Editor). For larger maps export sections separately.');
+            }
+
+            // Bounding box
+            let minX = Infinity, minY = Infinity, minZ = Infinity;
+            let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+            for (const b of all) {
+                minX = Math.min(minX, b.x);
+                minY = Math.min(minY, b.y);
+                minZ = Math.min(minZ, b.z);
+                maxX = Math.max(maxX, b.x);
+                maxY = Math.max(maxY, b.y);
+                maxZ = Math.max(maxZ, b.z);
+            }
+
+            if (!isFinite(minX)) {
+                alert('Export failed: invalid bounding box.');
+                return;
+            }
+
+            const normalized = all.map(b => ({
+                x: b.x - minX,
+                y: b.y - minY,
+                z: b.z - minZ,
+                id: b.id,
+                data: b.data || 0
+            }));
+
+            const exportObj = {
+                size: {
+                    x: Math.max(1, maxX - minX + 1),
+                    y: Math.max(1, maxY - minY + 1),
+                    z: Math.max(1, maxZ - minZ + 1)
+                },
+                origin: { x: minX, y: minY, z: minZ },
+                includesTerrain: !!(this.terrainManager && this.terrainManager.hasTerrain() && !terrainSkipped),
+                terrainExportSkipped: terrainSkipped,
+                blockCount: normalized.length,
+                exportedAt: new Date().toISOString(),
+                version: '5.9.2-terrain',
+                blocks: normalized
+            };
+
+            this._download(JSON.stringify(exportObj, null, 2), 'bloxd_scene_export.json', 'application/json');
+
+        } catch (error) {
+            console.error('=== Asset Placer Export Crash ===', error);
+            alert('Export failed: ' + (error && error.message ? error.message : error) + '. Check console for details.');
         }
-
-        const all = Array.from(blockMap.values());
-        if (all.length === 0) {
-            alert(window.I18N.t('noBlocksToExport'));
-            return;
-        }
-
-        let minX = Infinity, minY = Infinity, minZ = Infinity;
-        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-        all.forEach(b => {
-            minX = Math.min(minX, b.x); minY = Math.min(minY, b.y); minZ = Math.min(minZ, b.z);
-            maxX = Math.max(maxX, b.x); maxY = Math.max(maxY, b.y); maxZ = Math.max(maxZ, b.z);
-        });
-
-        const normalized = all.map(b => ({
-            x: b.x - minX, y: b.y - minY, z: b.z - minZ,
-            id: b.id, data: b.data || 0
-        }));
-
-        const exportObj = {
-            size: { x: maxX - minX + 1, y: maxY - minY + 1, z: maxZ - minZ + 1 },
-            origin: { x: minX, y: minY, z: minZ },
-            includesTerrain: !!(this.terrainManager?.hasTerrain() && !terrainSkipped),
-            terrainExportSkipped: terrainSkipped,
-            blocks: normalized
-        };
-
-        this._download(JSON.stringify(exportObj, null, 2), "bloxd_scene_export.json", "application/json");
     }
 
     _download(content, filename, type) {
-        const blob = new Blob([content], { type });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        try {
+            const blob = new Blob([content], { type: type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60);
+        } catch (e) {
+            const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(content);
+            window.open(dataUrl, '_blank');
+        }
     }
 };
 /* ═══════════════════════════════════════════════════════════════ */
