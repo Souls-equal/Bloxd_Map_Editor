@@ -1015,10 +1015,9 @@ window.ExplorerUI = class ExplorerUI {
 };
 /**
  * Exporter — follows TerrainManager export logic exactly
- * Uses exact thresholds (512*512, 350000), heightmap-streaming detection,
- * getExportBlocks(), HARD_MAX guard, early breaks, limited auto-terraform.
- * Preserves all GitHub calls: getTemplateSchem, _centerOffset, BABYLON transforms,
- * autoTerraform + 3-ring footprint, priority flags, getSurfaceBlockAtWorld.
+ * Exports as REAL .bloxdschem binary (like Terrain Editor)
+ * Uses exact thresholds, HARD_MAX, early breaks, etc.
+ * Preserves all GitHub calls and features.
  */
 
 window.Exporter = class Exporter {
@@ -1030,8 +1029,57 @@ window.Exporter = class Exporter {
         this.largeAreaThreshold = 512 * 512;
         this.largeBlockThreshold = 350000;
 
-        // Hard safety cap to prevent Map maximum size exceeded (well below limits)
+        // Hard safety cap
         this.HARD_MAX_BLOCKS = 18000;
+
+        // Minimal BloxdIO writers (inlined for self-contained .bloxdschem export)
+        this.CHUNK = 32;
+        this.CHUNK_VOL = 32 * 32 * 32;
+    }
+
+    _writeUvarint(n) {
+        n = Math.floor(n);
+        const out = [];
+        while (n >= 0x80) {
+            out.push((n & 0x7f) | 0x80);
+            n = Math.floor(n / 128);
+        }
+        out.push(n & 0x7f);
+        return new Uint8Array(out);
+    }
+
+    _writeAvroInt(n) {
+        n = Math.floor(n);
+        const zz = n < 0 ? ((-n) * 2 - 1) : (n * 2);
+        return this._writeUvarint(zz);
+    }
+
+    _writeAvroString(s) {
+        const enc = new TextEncoder().encode(s);
+        const lenBuf = this._writeAvroInt(enc.length);
+        const res = new Uint8Array(lenBuf.length + enc.length);
+        res.set(lenBuf, 0);
+        res.set(enc, lenBuf.length);
+        return res;
+    }
+
+    _encodeChunkRLE(blocks) {
+        const parts = [];
+        let i = 0;
+        while (i < blocks.length) {
+            let curr = blocks[i];
+            let run = 1;
+            while (i + run < blocks.length && blocks[i + run] === curr && run < 0x7fffffff) run++;
+            parts.push(this._writeUvarint(run));
+            parts.push(this._writeUvarint(curr));
+            i += run;
+        }
+        let total = 0;
+        for (const p of parts) total += p.length;
+        const res = new Uint8Array(total);
+        let o = 0;
+        for (const p of parts) { res.set(p, o); o += p.length; }
+        return res;
     }
 
     exportSingleSchem() {
@@ -1045,7 +1093,6 @@ window.Exporter = class Exporter {
 
             const putBlock = (rawBlock, source, instance = null) => {
                 if (!rawBlock) return;
-                // HARD guard BEFORE any key or set
                 if (blockMap.size >= this.HARD_MAX_BLOCKS) return;
 
                 const x = toNum(rawBlock.x);
@@ -1072,6 +1119,7 @@ window.Exporter = class Exporter {
             };
 
             let terrainSkipped = false;
+            let isLargeTerrain = false;
 
             // === TERRAIN: exact same decision as TerrainManager ===
             if (this.terrainManager &&
@@ -1090,17 +1138,17 @@ window.Exporter = class Exporter {
                     area = totalColumns * 64;
                 }
 
-                const isLarge =
+                isLargeTerrain =
                     (mode === 'heightmap-streaming') ||
                     (area > this.largeAreaThreshold) ||
                     (totalBlocks > this.largeBlockThreshold);
 
-                if (isLarge) {
+                if (isLargeTerrain) {
                     terrainSkipped = true;
-                    console.warn('[Exporter] Large terrain detected (TerrainManager policy) - skipping terrain');
-                    const msg = (window.I18N && window.I18N.t) ?
-                        window.I18N.t('largeTerrainExportSkipped') :
-                        'Large terrain detected (same as Terrain Editor). Terrain blocks skipped. Only placed assets exported.';
+                    console.warn('[Exporter] Large/streaming terrain (TerrainManager policy) - skipping terrain for .bloxdschem export');
+                    const msg = (window.I18N && window.I18N.t)
+                        ? window.I18N.t('largeTerrainExportSkipped')
+                        : 'Le terrain en mode streaming est trop volumineux pour un export .bloxdschem en un seul fichier. Export des assets placés uniquement pour le moment.';
                     alert(msg);
                 } else if (typeof this.terrainManager.getExportBlocks === 'function') {
                     try {
@@ -1115,7 +1163,7 @@ window.Exporter = class Exporter {
                 }
             }
 
-            // === PLACED ASSETS ===
+            // === PLACED ASSETS (with all GitHub transforms) ===
             const instances = (this.assetManager && Array.isArray(this.assetManager.instances))
                 ? this.assetManager.instances : [];
 
@@ -1183,13 +1231,11 @@ window.Exporter = class Exporter {
                     }
                 }
 
-                // Limited auto-terraform (only for tiny scenes, as per TerrainManager style)
+                // Limited auto-terraform (3 rings, guarded)
                 if (footprint && blockMap.size < this.HARD_MAX_BLOCKS * 0.08) {
                     const tm = this.terrainManager;
                     let baseY = Infinity;
-                    for (const y of footprint.values()) {
-                        if (y < baseY) baseY = y;
-                    }
+                    for (const y of footprint.values()) if (y < baseY) baseY = y;
                     if (!isFinite(baseY)) baseY = 0;
                     const floorY = baseY - 3;
 
@@ -1210,7 +1256,6 @@ window.Exporter = class Exporter {
                         }
                     };
 
-                    // Primary footprint
                     for (const [k, by] of footprint) {
                         if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
                         const p = k.split(',');
@@ -1218,7 +1263,6 @@ window.Exporter = class Exporter {
                         filled.add(k);
                     }
 
-                    // 3 rings (as in original) but guarded
                     if (blockMap.size < this.HARD_MAX_BLOCKS) {
                         let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
                         for (let ring = 1; ring <= 3; ring++) {
@@ -1249,10 +1293,10 @@ window.Exporter = class Exporter {
             }
 
             if (blockMap.size >= this.HARD_MAX_BLOCKS) {
-                alert('Export truncated at safety limit to avoid crash (same policy as Terrain Editor). For larger maps export sections separately.');
+                alert('Export truncated at safety limit (same policy as Terrain Editor). For larger maps export sections separately.');
             }
 
-            // Bounding box
+            // Compute bounding box
             let minX = Infinity, minY = Infinity, minZ = Infinity;
             let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
@@ -1270,40 +1314,106 @@ window.Exporter = class Exporter {
                 return;
             }
 
-            const normalized = all.map(b => ({
-                x: b.x - minX,
-                y: b.y - minY,
-                z: b.z - minZ,
-                id: b.id,
-                data: b.data || 0
-            }));
+            const sizeX = Math.max(1, maxX - minX + 1);
+            const sizeY = Math.max(1, maxY - minY + 1);
+            const sizeZ = Math.max(1, maxZ - minZ + 1);
 
-            const exportObj = {
-                size: {
-                    x: Math.max(1, maxX - minX + 1),
-                    y: Math.max(1, maxY - minY + 1),
-                    z: Math.max(1, maxZ - minZ + 1)
-                },
-                origin: { x: minX, y: minY, z: minZ },
-                includesTerrain: !!(this.terrainManager && this.terrainManager.hasTerrain() && !terrainSkipped),
-                terrainExportSkipped: terrainSkipped,
-                blockCount: normalized.length,
-                exportedAt: new Date().toISOString(),
-                version: '5.9.2-terrain',
-                blocks: normalized
-            };
+            // Build .bloxdschem binary (exactly like Terrain Editor)
+            const bytes = this._buildBloxdSchemBinary(all, minX, minY, minZ, sizeX, sizeY, sizeZ);
 
-            this._download(JSON.stringify(exportObj, null, 2), 'bloxd_scene_export.json', 'application/json');
+            const filename = 'bloxd_export.bloxdschem';
+            this._downloadBinary(bytes, filename, 'application/octet-stream');
 
         } catch (error) {
             console.error('=== Asset Placer Export Crash ===', error);
-            alert('Export failed: ' + (error && error.message ? error.message : error) + '. Check console for details.');
+            alert('Export failed: ' + (error && error.message ? error.message : error) + '. Check console.');
         }
     }
 
-    _download(content, filename, type) {
+    _buildBloxdSchemBinary(flatBlocks, minX, minY, minZ, sizeX, sizeY, sizeZ) {
+        const CHUNK = this.CHUNK;
+        const CHUNK_VOL = this.CHUNK_VOL;
+
+        // Build chunk map (normalized coordinates)
+        const chunks = new Map(); // "cx,cy,cz" -> Int32Array(CHUNK_VOL)
+
+        const getChunk = (cx, cy, cz) => {
+            const key = cx + ',' + cy + ',' + cz;
+            let arr = chunks.get(key);
+            if (!arr) {
+                arr = new Int32Array(CHUNK_VOL);
+                chunks.set(key, arr);
+            }
+            return arr;
+        };
+
+        for (const b of flatBlocks) {
+            const nx = b.x - minX;
+            const ny = b.y - minY;
+            const nz = b.z - minZ;
+
+            const cx = Math.floor(nx / CHUNK);
+            const cy = Math.floor(ny / CHUNK);
+            const cz = Math.floor(nz / CHUNK);
+
+            const lx = nx - cx * CHUNK;
+            const ly = ny - cy * CHUNK;
+            const lz = nz - cz * CHUNK;
+
+            const arr = getChunk(cx, cy, cz);
+            const idx = lx * 1024 + ly * 32 + lz;
+            arr[idx] = b.id;
+        }
+
+        // Build the binary file (Avro + RLE format)
+        const parts = [];
+        parts.push(new Uint8Array([0, 0, 0, 0])); // header
+        parts.push(this._writeAvroString('BloxdExport'));
+        parts.push(this._writeAvroInt(0)); // px
+        parts.push(this._writeAvroInt(0)); // py
+        parts.push(this._writeAvroInt(0)); // pz
+        parts.push(this._writeAvroInt(sizeX));
+        parts.push(this._writeAvroInt(sizeY));
+        parts.push(this._writeAvroInt(sizeZ));
+
+        // Collect all chunk keys in a deterministic order
+        const chunkKeys = Array.from(chunks.keys()).sort();
+        const totalChunks = chunkKeys.length;
+
+        // Write chunk count
+        parts.push(this._writeAvroInt(totalChunks));
+
+        for (const key of chunkKeys) {
+            const [cx, cy, cz] = key.split(',').map(Number);
+            parts.push(this._writeAvroInt(cx));
+            parts.push(this._writeAvroInt(cy));
+            parts.push(this._writeAvroInt(cz));
+
+            const arr = chunks.get(key);
+            const rle = this._encodeChunkRLE(arr);
+            // Write length + bytes (as avro bytes)
+            parts.push(this._writeAvroInt(rle.length));
+            parts.push(rle);
+        }
+
+        // End marker
+        parts.push(this._writeAvroInt(0));
+
+        // Concatenate
+        let totalLen = 0;
+        for (const p of parts) totalLen += p.length;
+        const result = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const p of parts) {
+            result.set(p, offset);
+            offset += p.length;
+        }
+        return result;
+    }
+
+    _downloadBinary(bytes, filename, mime) {
         try {
-            const blob = new Blob([content], { type: type });
+            const blob = new Blob([bytes], { type: mime });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1311,10 +1421,18 @@ window.Exporter = class Exporter {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60);
+            setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 80);
         } catch (e) {
-            const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(content);
-            window.open(dataUrl, '_blank');
+            // Fallback
+            console.error('Binary download failed, falling back to data URL (may be slow for large files)');
+            const b64 = btoa(String.fromCharCode.apply(null, new Uint8Array(bytes)));
+            const dataUrl = 'data:application/octet-stream;base64,' + b64;
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
     }
 };
