@@ -495,7 +495,7 @@ window.LibraryUI = class LibraryUI {
             }
         });
         document.getElementById('btn-export-single').addEventListener('click', () => {
-            if (window.appExporter) window.appExporter.exportSingleSchem();
+            if (window.appExporter) window.appExporter.openExportModal();
         });
 
         // === Menu Session : sauvegarde / restauration des positions d'assets ===
@@ -1021,9 +1021,10 @@ window.ExplorerUI = class ExplorerUI {
  */
 
 window.Exporter = class Exporter {
-    constructor(assetManager, terrainManager = null) {
+    constructor(assetManager, terrainManager = null, selectionManager = null) {
         this.assetManager = assetManager;
         this.terrainManager = terrainManager;
+        this.selectionManager = selectionManager;
 
         // Exact same as TerrainManager
         this.largeAreaThreshold = 512 * 512;
@@ -1035,6 +1036,10 @@ window.Exporter = class Exporter {
         // Minimal BloxdIO writers (inlined for self-contained .bloxdschem export)
         this.CHUNK = 32;
         this.CHUNK_VOL = 32 * 32 * 32;
+
+        // Au-delà de ce nombre de chunks, on découpe en plusieurs fichiers .bloxdschem
+        // (même limite que le Terrain Editor : Bloxd.io refuse ~200+ chunks par //schematic load)
+        this.MAX_CHUNKS_PER_FILE = 180;
     }
 
     _writeUvarint(n) {
@@ -1082,7 +1087,144 @@ window.Exporter = class Exporter {
         return res;
     }
 
-    exportSingleSchem() {
+    // === Modale d'export (nom de fichier / dossier / ancre / mode / mono-fichier forcé) ===
+    _ensureModal() {
+        if (document.getElementById('ap-export-modal')) return;
+        const overlay = document.getElementById('ui-overlay') || document.body;
+        const modal = document.createElement('div');
+        modal.id = 'ap-export-modal';
+        modal.className = 'modal hidden';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><span data-i18n="exportModalTitle">📤 Export schematic</span></h3>
+                    <button class="close-btn" id="ap-export-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-desc" data-i18n="exportModalDesc"></p>
+
+                    <div class="form-group">
+                        <span class="form-label" data-i18n="exportModeLabel">What to export</span>
+                        <label class="export-mode-row">
+                            <input type="radio" name="ap-export-mode" value="all" checked>
+                            <span data-i18n="exportModeAll">Entire scene</span>
+                        </label>
+                        <label class="export-mode-row">
+                            <input type="radio" name="ap-export-mode" value="selected" id="ap-export-mode-selected-radio">
+                            <span data-i18n="exportModeSelected">Selected asset only</span>
+                        </label>
+                        <p class="hint-text" id="ap-export-mode-hint" data-i18n="exportModeSelectedHint"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="exportFilenameLabel">File name (if single schem)</label>
+                        <input type="text" id="ap-export-filename" class="input-text" placeholder="bloxd_export" value="bloxd_export">
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="exportFoldernameLabel">Folder name (if split into multiple schems)</label>
+                        <input type="text" id="ap-export-foldername" class="input-text" placeholder="schematics_decoupes" value="schematics_decoupes">
+                        <p class="sub-desc" data-i18n="exportFolderDesc"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label data-i18n="exportAnchorLabel">Paste anchor position</label>
+                        <div class="form-grid-3">
+                            <input type="number" class="input-text" id="ap-export-anchor-x" placeholder="X" value="0" step="1">
+                            <input type="number" class="input-text" id="ap-export-anchor-y" placeholder="Y" value="0" step="1">
+                            <input type="number" class="input-text" id="ap-export-anchor-z" placeholder="Z" value="0" step="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group toggle-box">
+                        <label class="toggle-row">
+                            <input type="checkbox" id="ap-export-force-single">
+                            <span data-i18n="exportForceSingleLabel">📄 Force a single .bloxdschem file</span>
+                        </label>
+                        <p class="sub-desc" data-i18n="exportForceSingleDesc" style="margin-left:24px;"></p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="ap-export-confirm" class="ui-btn primary" data-i18n="exportConfirmBtn">⬇️ Download</button>
+                </div>
+            </div>
+        `;
+        overlay.appendChild(modal);
+
+        const close = () => modal.classList.add('hidden');
+        document.getElementById('ap-export-close').addEventListener('click', close);
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+
+        const confirmBtn = document.getElementById('ap-export-confirm');
+        const confirmLabel = confirmBtn.innerHTML;
+
+        confirmBtn.addEventListener('click', async () => {
+            const t = (key, fallback) => (window.I18N && window.I18N.t) ? window.I18N.t(key) : fallback;
+
+            const sanitize = (raw, fallback) => {
+                const n = (raw || '').trim().replace(/\.bloxdschem$/i, '').replace(/[\\/:*?"<>|]/g, '');
+                return n.length > 0 ? n : fallback;
+            };
+
+            const mode = modal.querySelector('input[name="ap-export-mode"]:checked')?.value || 'all';
+            let onlySelectedInstance = null;
+            if (mode === 'selected') {
+                const sel = this.selectionManager && this.selectionManager.selectedInstance;
+                if (!sel || sel.isTerrainSelection) {
+                    alert(t('exportNoSelectionAlert', 'Select an asset first.'));
+                    return;
+                }
+                onlySelectedInstance = sel;
+            }
+
+            const filename = sanitize(document.getElementById('ap-export-filename').value, 'bloxd_export');
+            const foldername = sanitize(document.getElementById('ap-export-foldername').value, 'schematics_decoupes');
+            const anchor = {
+                x: parseInt(document.getElementById('ap-export-anchor-x').value, 10) || 0,
+                y: parseInt(document.getElementById('ap-export-anchor-y').value, 10) || 0,
+                z: parseInt(document.getElementById('ap-export-anchor-z').value, 10) || 0
+            };
+            const forceSingleSchem = !!document.getElementById('ap-export-force-single').checked;
+
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = t('exportGenerating', '⏳ Generating schematic...');
+            try {
+                await this.exportSingleSchem({ filename, foldername, anchor, forceSingleSchem, onlySelectedInstance });
+                close();
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.innerHTML = confirmLabel;
+            }
+        });
+
+        if (window.I18N && window.I18N.t) {
+            modal.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                const txt = window.I18N.t(key);
+                if (txt && txt !== key) el.innerHTML = txt;
+            });
+        }
+    }
+
+    openExportModal() {
+        this._ensureModal();
+        const modal = document.getElementById('ap-export-modal');
+        const radio = document.getElementById('ap-export-mode-selected-radio');
+        const hint = document.getElementById('ap-export-mode-hint');
+        const sel = this.selectionManager && this.selectionManager.selectedInstance;
+        const hasSelection = !!(sel && !sel.isTerrainSelection);
+
+        radio.disabled = !hasSelection;
+        if (!hasSelection) {
+            radio.checked = false;
+            modal.querySelector('input[name="ap-export-mode"][value="all"]').checked = true;
+        }
+        hint.style.display = hasSelection ? 'none' : 'block';
+        modal.classList.remove('hidden');
+    }
+
+    async exportSingleSchem(options = {}) {
+        const targetInstance = options.onlySelectedInstance || null;
         try {
             const blockMap = new Map();
 
@@ -1121,8 +1263,8 @@ window.Exporter = class Exporter {
             let terrainSkipped = false;
             let isLargeTerrain = false;
 
-            // === TERRAIN: exact same decision as TerrainManager ===
-            if (this.terrainManager &&
+            // === TERRAIN: exact same decision as TerrainManager (skipped if exporting a single asset) ===
+            if (!targetInstance && this.terrainManager &&
                 typeof this.terrainManager.hasTerrain === 'function' &&
                 this.terrainManager.hasTerrain()) {
 
@@ -1164,8 +1306,9 @@ window.Exporter = class Exporter {
             }
 
             // === PLACED ASSETS (with all GitHub transforms) ===
-            const instances = (this.assetManager && Array.isArray(this.assetManager.instances))
-                ? this.assetManager.instances : [];
+            const instances = targetInstance
+                ? [targetInstance]
+                : ((this.assetManager && Array.isArray(this.assetManager.instances)) ? this.assetManager.instances : []);
 
             for (const inst of instances) {
                 if (!inst || typeof inst.name !== 'string') continue;
@@ -1293,7 +1436,8 @@ window.Exporter = class Exporter {
             }
 
             if (blockMap.size >= this.HARD_MAX_BLOCKS) {
-                alert('Export truncated at safety limit (same policy as Terrain Editor). For larger maps export sections separately.');
+                const t = (window.I18N && window.I18N.t) ? window.I18N.t('exportSplitTruncated') : null;
+                alert(t || 'Export truncated at safety limit (same policy as Terrain Editor). For larger scenes export sections separately.');
             }
 
             // Compute bounding box
@@ -1318,11 +1462,23 @@ window.Exporter = class Exporter {
             const sizeY = Math.max(1, maxY - minY + 1);
             const sizeZ = Math.max(1, maxZ - minZ + 1);
 
-            // Build .bloxdschem binary (exactly like Terrain Editor)
-            const bytes = this._buildBloxdSchemBinary(all, minX, minY, minZ, sizeX, sizeY, sizeZ);
+            // Regroupe les blocs en chunks 32x32x32 (une seule fois, réutilisé pour
+            // le fichier unique OU pour le découpage en régions ci-dessous).
+            const chunks = this._buildChunkMap(all, minX, minY, minZ);
+            const totalChunks = chunks.size;
 
-            const filename = 'bloxd_export.bloxdschem';
-            this._downloadBinary(bytes, filename, 'application/octet-stream');
+            const filename = options.filename || 'bloxd_export';
+            const foldername = options.foldername || 'schematics_decoupes';
+            const forceSingle = !!options.forceSingleSchem;
+
+            if (forceSingle || totalChunks <= this.MAX_CHUNKS_PER_FILE) {
+                // === UN SEUL FICHIER .bloxdschem (comme avant) ===
+                const bytes = this._writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ);
+                this._downloadBinary(bytes, `${filename}.bloxdschem`, 'application/octet-stream');
+            } else {
+                // === Scène trop grande (>180 chunks) : découpage en régions + ZIP ===
+                await this._exportSplitZip(chunks, sizeY, foldername, options.anchor || { x: 0, y: 0, z: 0 });
+            }
 
         } catch (error) {
             console.error('=== Asset Placer Export Crash ===', error);
@@ -1330,11 +1486,131 @@ window.Exporter = class Exporter {
         }
     }
 
-    _buildBloxdSchemBinary(flatBlocks, minX, minY, minZ, sizeX, sizeY, sizeZ) {
+    /**
+     * Découpe une scène trop volumineuse (>MAX_CHUNKS_PER_FILE chunks) en plusieurs
+     * fichiers .bloxdschem répartis sur une grille X/Z, regroupés dans un .zip avec
+     * un guide de chargement — même logique que le Terrain Editor.
+     */
+    async _exportSplitZip(chunks, sizeY, foldername, anchor) {
+        if (!window.JSZip) {
+            const t = (window.I18N && window.I18N.t) ? window.I18N.t('exportZipMissing') : null;
+            alert(t || 'JSZip is missing: add the JSZip script tag to asset_placer.html to enable multi-file export.');
+            return;
+        }
+
+        const CHUNK = this.CHUNK;
+
+        // Étendue réelle en chunks (X/Z) occupée par la scène
+        let minCx = Infinity, maxCx = -Infinity, minCz = Infinity, maxCz = -Infinity;
+        const yChunkSet = new Set();
+        for (const key of chunks.keys()) {
+            const [cx, cy, cz] = key.split(',').map(Number);
+            if (cx < minCx) minCx = cx;
+            if (cx > maxCx) maxCx = cx;
+            if (cz < minCz) minCz = cz;
+            if (cz > maxCz) maxCz = cz;
+            yChunkSet.add(cy);
+        }
+        const tilesX = maxCx - minCx + 1;
+        const tilesZ = maxCz - minCz + 1;
+        const nYChunks = Math.max(1, yChunkSet.size);
+
+        // Même formule que le Terrain Editor : régions dimensionnées pour rester
+        // sous la limite de chunks/fichier, quel que soit le nombre de couches Y.
+        const maxTilesPerAxis = Math.max(1, Math.floor(Math.sqrt(this.MAX_CHUNKS_PER_FILE / nYChunks)));
+
+        const files = [];
+        let partNum = 1;
+        for (let stx = minCx; stx <= maxCx; stx += maxTilesPerAxis) {
+            const etx = Math.min(maxCx + 1, stx + maxTilesPerAxis);
+            for (let stz = minCz; stz <= maxCz; stz += maxTilesPerAxis) {
+                const etz = Math.min(maxCz + 1, stz + maxTilesPerAxis);
+
+                const regionChunks = new Map();
+                for (const [key, arr] of chunks) {
+                    const [cx, cy, cz] = key.split(',').map(Number);
+                    if (cx >= stx && cx < etx && cz >= stz && cz < etz) {
+                        regionChunks.set(`${cx - stx},${cy},${cz - stz}`, arr);
+                    }
+                }
+                if (regionChunks.size === 0) continue;
+
+                const regSizeX = (etx - stx) * CHUNK;
+                const regSizeZ = (etz - stz) * CHUNK;
+                const bytes = this._writeBinaryFromChunks(regionChunks, regSizeX, sizeY, regSizeZ);
+
+                const offsetX = (stx - minCx) * CHUNK;
+                const offsetZ = (stz - minCz) * CHUNK;
+                const posX = anchor.x + offsetX;
+                const posY = anchor.y;
+                const posZ = anchor.z + offsetZ;
+                const schemName = `${partNum}_[${posX},${posY},${posZ}]`;
+
+                files.push({ name: `${schemName}.bloxdschem`, bytes, posX, posY, posZ });
+                partNum++;
+            }
+        }
+
+        if (files.length === 0) {
+            alert('Export failed: no blocks found for split.');
+            return;
+        }
+
+        if (files.length === 1) {
+            // Le découpage n'a finalement produit qu'une seule région non-vide
+            this._downloadBinary(files[0].bytes, files[0].name, 'application/octet-stream');
+            return;
+        }
+
+        const zip = new window.JSZip();
+        const schemFolder = zip.folder(foldername);
+
+        let guideTxt = "============================================================\n";
+        guideTxt += "📦 SCÈNE DÉCOUPÉE EN PARTIES (<200 CHUNKS/FICHIER)\n";
+        guideTxt += "============================================================\n\n";
+        guideTxt += "Cette scène (terrain + assets) étant volumineuse, elle a été découpée en\n";
+        guideTxt += "plusieurs fichiers pour respecter la limite technique de Bloxd.io\n";
+        guideTxt += "(~200 chunks maximum par commande //schematic load).\n\n";
+        guideTxt += "⚠️ IMPORTANT : Bloxd.io ne repositionne PAS automatiquement chaque partie à sa\n";
+        guideTxt += "place dans le monde : c'est à VOUS de vous déplacer entre deux chargements,\n";
+        guideTxt += "sinon toutes les parties se superposent au même endroit.\n\n";
+        guideTxt += "INSTRUCTIONS D'IMPORTATION :\n";
+        guideTxt += `1. Placez tous les fichiers .bloxdschem du dossier "${foldername}" dans le répertoire schématiques de Bloxd.\n`;
+        guideTxt += "2. En jeu, rendez-vous à la position de l'angle de collage indiquée dans le nom du 1er fichier.\n";
+        guideTxt += "3. Pour chaque fichier ci-dessous, déplacez-vous à la position [posX,posY,posZ] indiquée dans\n";
+        guideTxt += "   son nom, PUIS chargez-le :\n\n";
+        guideTxt += "🚨 RÈGLE D'OR — ALTITUDE Y CONSTANTE :\n";
+        guideTxt += "Bloxd colle chaque schéma PAR RAPPORT À VOTRE POSITION, Y COMPRIS VOTRE HAUTEUR !\n";
+        guideTxt += `Chargez TOUTES les parties depuis EXACTEMENT la même altitude Y=${anchor.y}.\n`;
+        guideTxt += "Si vous marchez sur du terrain déjà généré (dunes, collines...), votre Y varie et\n";
+        guideTxt += "la partie suivante sera DÉCALÉE VERTICALEMENT.\n";
+        guideTxt += "👉 Astuce : passez en vol (/fly ou mode créatif), placez-vous à Y exact affiché\n";
+        guideTxt += "   à l'écran, et vérifiez ce Y avant CHAQUE //schematic load.\n\n";
+
+        files.forEach(f => {
+            schemFolder.file(f.name, f.bytes);
+            const short = f.name.replace(/\.bloxdschem$/i, '');
+            guideTxt += `   [${short}] Position : X=${f.posX}, Y=${f.posY}, Z=${f.posZ}\n`;
+            guideTxt += `   //schematic load ${short}\n\n`;
+        });
+
+        schemFolder.file("GUIDE_CHARGEMENT_PARTIES.txt", guideTxt);
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${foldername}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    /** Regroupe une liste de blocs plats (coordonnées monde) en chunks 32³ normalisés. */
+    _buildChunkMap(flatBlocks, minX, minY, minZ) {
         const CHUNK = this.CHUNK;
         const CHUNK_VOL = this.CHUNK_VOL;
-
-        // Build chunk map (normalized coordinates)
         const chunks = new Map(); // "cx,cy,cz" -> Int32Array(CHUNK_VOL)
 
         const getChunk = (cx, cy, cz) => {
@@ -1365,7 +1641,11 @@ window.Exporter = class Exporter {
             arr[idx] = b.id;
         }
 
-        // Build the binary file (Avro + RLE format)
+        return chunks;
+    }
+
+    /** Sérialise une map de chunks (clés "cx,cy,cz" relatives) en binaire .bloxdschem (Avro + RLE). */
+    _writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ) {
         const parts = [];
         parts.push(new Uint8Array([0, 0, 0, 0])); // header
         parts.push(this._writeAvroString('BloxdExport'));
@@ -1409,6 +1689,12 @@ window.Exporter = class Exporter {
             offset += p.length;
         }
         return result;
+    }
+
+    /** Conservé pour compatibilité : construit directement le binaire depuis une liste de blocs plats. */
+    _buildBloxdSchemBinary(flatBlocks, minX, minY, minZ, sizeX, sizeY, sizeZ) {
+        const chunks = this._buildChunkMap(flatBlocks, minX, minY, minZ);
+        return this._writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ);
     }
 
     _downloadBinary(bytes, filename, mime) {
@@ -1735,7 +2021,7 @@ window.addEventListener('DOMContentLoaded', () => {
         new window.ExplorerUI(assetManager, terrainManager, selectionManager);
         new window.UIManager(scene, assetManager, selectionManager, dragDropManager);
 
-        window.appExporter = new window.Exporter(assetManager, terrainManager);
+        window.appExporter = new window.Exporter(assetManager, terrainManager, selectionManager);
 
         // === Sauvegarde / restauration des positions d'assets ===
         // Créé APRÈS ExplorerUI pour chaîner son onChanged sans l'écraser.
