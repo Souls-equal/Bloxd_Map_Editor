@@ -1760,7 +1760,14 @@ window.Exporter = class Exporter {
         }
         assetCells.clear(); // priorités déjà résolues dans les chunks
 
-        const totalChunks = chunks.size;
+        // Le format Bloxd ne sérialise pas une liste « sparse » de chunks : le
+        // nombre de chunks annoncé doit correspondre à toute la grille définie
+        // par sizeX × sizeY × sizeZ. Les fichiers produits par l'éditeur de
+        // terrain et les schems fournis remplissent les trous avec un chunk AIR.
+        // Compter seulement chunks.size créait un fichier lisible par notre
+        // prévisualiseur, mais incomplet pour le décodeur serveur de Bloxd (HTTP
+        // 400 lors du //schematic load).
+        const totalChunks = nCX * nCY * nCZ;
         const elapsedMs = Math.round(
             ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0
         );
@@ -1823,9 +1830,13 @@ window.Exporter = class Exporter {
             const posX = anchor.x + stx * CHUNK;
             const posY = anchor.y;
             const posZ = anchor.z + stz * CHUNK;
+            // _writeBinaryFromChunks complète les trous de la grille avec de
+            // l'air. Le compteur affiché doit donc refléter la grille réellement
+            // présente dans le fichier, et non uniquement ses chunks non vides.
+            const regionChunkCount = (etx - stx) * nCY * (etz - stz);
             files.push({
                 name: `${partNum}_[${posX},${posY},${posZ}].bloxdschem`,
-                bytes, posX, posY, posZ, chunkCount: regionChunks.size
+                bytes, posX, posY, posZ, chunkCount: regionChunkCount
             });
             partNum++;
             progress('splitting', ri + 1, regions.length);
@@ -1910,10 +1921,24 @@ window.Exporter = class Exporter {
 
     _yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
 
-    /** Sérialise une map de chunks (clés "cx,cy,cz" relatives) en binaire .bloxdschem (Avro + RLE). */
+    /**
+     * Sérialise une grille complète de chunks en binaire .bloxdschem (Avro + RLE).
+     *
+     * Bloxd attend un enregistrement pour CHAQUE cellule de la grille annoncée
+     * dans l'en-tête, y compris celles qui ne contiennent que de l'air. Une map
+     * sparse est pratique en mémoire, mais ne constitue pas un .bloxdschem
+     * valide côté jeu : les chunks suivants sont alors lus à un mauvais offset.
+     */
     _writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ) {
         const parts = [];
-        parts.push(new Uint8Array([0, 0, 0, 0])); // header
+        const nCX = Math.max(1, Math.ceil(sizeX / this.CHUNK));
+        const nCY = Math.max(1, Math.ceil(sizeY / this.CHUNK));
+        const nCZ = Math.max(1, Math.ceil(sizeZ / this.CHUNK));
+        const totalChunks = nCX * nCY * nCZ;
+        const airRle = this._encodeChunkRLE(new Int32Array(this.CHUNK_VOL));
+        const MAX_AVRO_BLOCK_ENTRIES = 512; // même découpage que Terrain Editor
+
+        parts.push(new Uint8Array([0, 0, 0, 0])); // header Avro v0
         parts.push(this._writeAvroString('BloxdExport'));
         parts.push(this._writeAvroInt(0)); // px
         parts.push(this._writeAvroInt(0)); // py
@@ -1922,30 +1947,32 @@ window.Exporter = class Exporter {
         parts.push(this._writeAvroInt(sizeY));
         parts.push(this._writeAvroInt(sizeZ));
 
-        // Collect all chunk keys in a deterministic order
-        const chunkKeys = Array.from(chunks.keys()).sort();
-        const totalChunks = chunkKeys.length;
-
-        // Write chunk count
-        parts.push(this._writeAvroInt(totalChunks));
-
-        for (const key of chunkKeys) {
-            const [cx, cy, cz] = key.split(',').map(Number);
-            parts.push(this._writeAvroInt(cx));
-            parts.push(this._writeAvroInt(cy));
-            parts.push(this._writeAvroInt(cz));
-
-            const arr = chunks.get(key);
-            const rle = this._encodeChunkRLE(arr);
-            // Write length + bytes (as avro bytes)
-            parts.push(this._writeAvroInt(rle.length));
-            parts.push(rle);
+        // Un tableau Avro peut être découpé en plusieurs blocs. Cette forme est
+        // celle produite par les autres exporteurs du projet et évite un bloc
+        // Avro géant pour les grandes scènes.
+        let inAvroBlock = 0;
+        const startAvroBlock = (count) => parts.push(this._writeAvroInt(count));
+        for (let cx = 0; cx < nCX; cx++) {
+            for (let cy = 0; cy < nCY; cy++) {
+                for (let cz = 0; cz < nCZ; cz++) {
+                    if (inAvroBlock === 0) {
+                        startAvroBlock(Math.min(MAX_AVRO_BLOCK_ENTRIES, totalChunks - (cx * nCY * nCZ + cy * nCZ + cz)));
+                    }
+                    const key = cx + ',' + cy + ',' + cz;
+                    const arr = chunks.get(key);
+                    const rle = arr ? this._encodeChunkRLE(arr) : airRle;
+                    parts.push(this._writeAvroInt(cx));
+                    parts.push(this._writeAvroInt(cy));
+                    parts.push(this._writeAvroInt(cz));
+                    parts.push(this._writeAvroInt(rle.length)); // avro bytes
+                    parts.push(rle);
+                    inAvroBlock = (inAvroBlock + 1) % MAX_AVRO_BLOCK_ENTRIES;
+                }
+            }
         }
 
-        // End marker
-        parts.push(this._writeAvroInt(0));
+        parts.push(this._writeAvroInt(0)); // fin du tableau Avro
 
-        // Concatenate
         let totalLen = 0;
         for (const p of parts) totalLen += p.length;
         const result = new Uint8Array(totalLen);
