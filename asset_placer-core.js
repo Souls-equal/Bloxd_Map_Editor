@@ -2831,30 +2831,85 @@ window.TerrainManager = class TerrainManager {
             if (mesh) { mesh.name = fileName || 'terrain'; mesh.isPickable = true; mesh.metadata = Object.assign({}, mesh.metadata, { isTerrain: true }); }
             return mesh;
         }
-        // Gros terrain : on ne dessine que le dessus (top block de chaque colonne X,Z).
+        // Gros terrain : surface = DESSUS + FACES LATÉRALES (jupes vers les voisins
+        // plus bas, et sur les bords de la carte).
+        // FIX : auparavant seul le quad du dessus était émis. Les gradins étaient
+        // donc creux — le terrain n'ayant ni flancs ni dessous, on voyait le fond
+        // de la scène à travers chaque marche. Même logique que
+        // _renderHeightmapSurface(), qui gérait déjà correctement ces jupes.
         const cols = new Map();
+        let baseY = Infinity;
         for (const b of blocks) {
             const k = b.x + ',' + b.z;
             const c = cols.get(k);
             if (!c || b.y > c.y) cols.set(k, { y: b.y, id: b.id });
+            if (b.y < baseY) baseY = b.y;
         }
-        const positions = [], indices = [], normals = [], colors = [];
-        let vi = 0;
-        const fp = [-0.5, 0, -0.5, 0.5, 0, -0.5, 0.5, 0, 0.5, -0.5, 0, 0.5];
-        const fi = [0, 2, 1, 0, 3, 2];
-        for (const [k, c] of cols) {
-            const p = k.split(','); const x = +p[0], z = +p[1], y = c.y;
+        if (!isFinite(baseY)) baseY = 0;
+
+        const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        const keyOf = (x, z) => x + ',' + z;
+        // Passe 1 : compte les quads (STRICTEMENT les mêmes conditions qu'à l'émission).
+        let sideCount = 0, borderCount = 0;
+        for (const [key, c] of cols) {
+            const p = key.split(','); const x = +p[0], z = +p[1];
+            for (const [dx, dz] of N4) {
+                const nc = cols.get(keyOf(x + dx, z + dz));
+                if (!nc) borderCount++;
+                else if (nc.y < c.y) sideCount++;
+            }
+        }
+        // Cap anti-OOM : au-delà, on ne garde que le dessus + les jupes de bord.
+        const nCols = cols.size;
+        const LIMIT = 2500000;
+        const borderOnly = (nCols + sideCount + borderCount) > LIMIT;
+        const total = nCols + (borderOnly ? borderCount : (sideCount + borderCount));
+
+        const positions = new Float32Array(total * 12);
+        const indices = total * 4 > 65535 ? new Uint32Array(total * 6) : new Uint16Array(total * 6);
+        const normals = new Float32Array(total * 12);
+        const colors = new Float32Array(total * 16);
+        const s = { pi: 0, ii: 0, ni: 0, ci: 0, vi: 0 };
+        const setV = (x, y, z, nx, ny, nz, col) => {
+            positions[s.pi++] = x; positions[s.pi++] = y; positions[s.pi++] = z;
+            normals[s.ni++] = nx; normals[s.ni++] = ny; normals[s.ni++] = nz;
+            colors[s.ci++] = col.r; colors[s.ci++] = col.g; colors[s.ci++] = col.b; colors[s.ci++] = 1;
+        };
+        const quad = (a, b, c, d, nn, col) => {
+            setV(a[0], a[1], a[2], nn[0], nn[1], nn[2], col);
+            setV(b[0], b[1], b[2], nn[0], nn[1], nn[2], col);
+            setV(c[0], c[1], c[2], nn[0], nn[1], nn[2], col);
+            setV(d[0], d[1], d[2], nn[0], nn[1], nn[2], col);
+            indices[s.ii++] = s.vi; indices[s.ii++] = s.vi + 2; indices[s.ii++] = s.vi + 1;
+            indices[s.ii++] = s.vi; indices[s.ii++] = s.vi + 3; indices[s.ii++] = s.vi + 2;
+            s.vi += 4;
+        };
+
+        for (const [key, c] of cols) {
+            const p = key.split(','); const x = +p[0], z = +p[1];
+            const lx = x + 0.5, lz = z + 0.5, topY = c.y + 1;
             const col = this._getBlockColor01(c.id);
-            for (let i = 0; i < fp.length; i += 3) positions.push(fp[i] + x + 0.5, fp[i + 1] + y + 1, fp[i + 2] + z + 0.5);
-            for (let i = 0; i < fi.length; i++) indices.push(fi[i] + vi);
-            for (let v = 0; v < 4; v++) { normals.push(0, 1, 0); colors.push(col.r, col.g, col.b, 1); }
-            vi += 4;
+            // Dessus (winding identique à l'ancien code : aucune régression sur les plateaux)
+            quad([lx - 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz - 0.5],
+                 [lx + 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz + 0.5], [0, 1, 0], col);
+            // Côtés : vers voisin plus bas, ou bord → jupe jusqu'à la base du terrain.
+            for (const [dx, dz] of N4) {
+                const nc = cols.get(keyOf(x + dx, z + dz));
+                const isBorder = !nc;
+                if (borderOnly && !isBorder) continue;
+                if (!isBorder && nc.y >= c.y) continue;     // voisin plus haut : c'est lui qui émet sa jupe
+                const bottomY = isBorder ? baseY : nc.y + 1;
+                if (dx === 1)       quad([lx + 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz + 0.5], [lx + 0.5, bottomY, lz + 0.5], [lx + 0.5, bottomY, lz - 0.5], [1, 0, 0], col);
+                else if (dx === -1) quad([lx - 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz - 0.5], [lx - 0.5, bottomY, lz - 0.5], [lx - 0.5, bottomY, lz + 0.5], [-1, 0, 0], col);
+                else if (dz === 1)  quad([lx + 0.5, topY, lz + 0.5], [lx - 0.5, topY, lz + 0.5], [lx - 0.5, bottomY, lz + 0.5], [lx + 0.5, bottomY, lz + 0.5], [0, 0, 1], col);
+                else                quad([lx - 0.5, topY, lz - 0.5], [lx + 0.5, topY, lz - 0.5], [lx + 0.5, bottomY, lz - 0.5], [lx - 0.5, bottomY, lz - 0.5], [0, 0, -1], col);
+            }
         }
         const vd = new BABYLON.VertexData();
-        vd.positions = new Float32Array(positions);
-        vd.indices = positions.length / 3 > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
-        vd.normals = new Float32Array(normals);
-        vd.colors = new Float32Array(colors);
+        vd.positions = positions.subarray(0, s.pi);
+        vd.indices = indices.subarray(0, s.ii);
+        vd.normals = normals.subarray(0, s.ni);
+        vd.colors = colors.subarray(0, s.ci);
         const mesh = new BABYLON.Mesh(fileName || 'terrain', this.scene);
         vd.applyToMesh(mesh);
         const mat = new BABYLON.StandardMaterial('terrainMat', this.scene);
