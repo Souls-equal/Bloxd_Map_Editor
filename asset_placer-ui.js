@@ -418,17 +418,33 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
      * sauvegardé n'a pas été chargé par le balayage de manifest (hoquet réseau,
      * arrêt anticipé…), on va chercher son fichier exact. Renvoie true si le
      * template est disponible après l'appel.
+     *
+     * Gère aussi les noms *dé-doublonnés* par _makeUniqueTemplateName() : quand
+     * deux entrées du manifest produisent le même nom de base, la seconde est
+     * enregistrée « <base> 2 », « <base> 3 »… Or la session sauvegarde ce nom
+     * suffixé, alors qu'aucun fichier « <base> 2.bloxdschem » n'existe sur le
+     * disque. On retombe donc sur le fichier de base, tout en enregistrant le
+     * template sous le nom suffixé exact attendu par la sauvegarde.
      */
     async ensureTemplateLoaded(name) {
         if (!name) return false;
         if (this.assetManager.hasTemplate(name)) return true;
 
+        // Noms de fichiers à tenter, dans l'ordre de préférence :
+        //  1. le nom exact (couvre un vrai fichier nommé « maison 2.bloxdschem ») ;
+        //  2. le nom sans suffixe de dé-doublonnage « <base> N » ajouté au chargement.
+        const baseNames = [name];
+        const dedup = /^(.*\S)\s+(\d+)$/.exec(name);
+        if (dedup) baseNames.push(dedup[1]);
+
         // Candidats de chemins : nom tel quel + variantes d'extension supportées.
         const candidates = [];
-        if (/\.(bloxdschem|json|schem)$/i.test(name)) {
-            candidates.push(`${this.schemsDir}${name}`);
-        } else {
-            for (const ext of this.supportedExtensions) candidates.push(`${this.schemsDir}${name}${ext}`);
+        for (const base of baseNames) {
+            if (/\.(bloxdschem|json|schem)$/i.test(base)) {
+                candidates.push(`${this.schemsDir}${base}`);
+            } else {
+                for (const ext of this.supportedExtensions) candidates.push(`${this.schemsDir}${base}${ext}`);
+            }
         }
 
         for (const fullPath of candidates) {
