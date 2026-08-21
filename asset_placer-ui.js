@@ -1121,10 +1121,18 @@ window.ExplorerUI = class ExplorerUI {
     }
 };
 /**
- * Exporter — follows TerrainManager export logic exactly
- * Exports as REAL .bloxdschem binary (like Terrain Editor)
- * Uses exact thresholds, HARD_MAX, early breaks, etc.
- * Preserves all GitHub calls and features.
+ * Exporter — export de la scène COMPLÈTE (terrain + tous les assets placés)
+ * en VRAI binaire .bloxdschem (comme le Terrain Editor).
+ *
+ * Mémoire : comme le Terrain Editor et le Schem Placer, la scène n'est JAMAIS
+ * stockée sous forme d'objets par-bloc. L'accumulation se fait au NIVEAU CHUNK
+ * (32×32×32, Int32Array) — l'ancienne implémentation mettait chaque bloc dans
+ * une Map d'objets et dépassait la limite V8 (~16,7M entrées) sur les grandes
+ * maps : "RangeError: Map maximum size exceeded".
+ *
+ * Pipeline : bornes monde → passe unique d'accumulation en Map de chunks →
+ * si > MAX_CHUNKS_PER_FILE chunks, découpage en régions (mêmes formules que
+ * le Terrain Editor / Schem Placer) + .zip avec guide de chargement.
  */
 
 window.Exporter = class Exporter {
@@ -1137,12 +1145,8 @@ window.Exporter = class Exporter {
         this.largeAreaThreshold = 512 * 512;
         this.largeBlockThreshold = 350000;
 
-        // No hard truncation: comme le Terrain Editor, on n'ampute plus la scène.
-        // Les scènes trop grandes (>MAX_CHUNKS_PER_FILE chunks) sont automatiquement
-        // découpées en plusieurs .bloxdschem regroupés dans un .zip (voir _exportSplitZip).
-        // Ce garde-fou très haut n'existe que pour éviter un OOM navigateur sur une
-        // scène pathologique (des dizaines de millions de blocs) ; en pratique il
-        // n'est jamais atteint car l'export streame par chunks.
+        // Garde-fou anti-OOM (jamais atteint en pratique, l'export est borné par
+        // chunks) : au-delà de ce nombre de BLOCS écrits, on stoppe et on avertit.
         this.HARD_MAX_BLOCKS = 80000000;
 
         // Minimal BloxdIO writers (inlined for self-contained .bloxdschem export)
@@ -1152,6 +1156,11 @@ window.Exporter = class Exporter {
         // Au-delà de ce nombre de chunks, on découpe en plusieurs fichiers .bloxdschem
         // (même limite que le Terrain Editor : Bloxd.io refuse ~200+ chunks par //schematic load)
         this.MAX_CHUNKS_PER_FILE = 180;
+
+        // Épaisseur de remplissage sous la surface d'un terrain heightmap à l'export —
+        // DOIT rester identique à TerrainManager.getExportBlocks() (FILL_DEPTH = 4),
+        // sinon l'export divergerait de la surface visible dans l'éditeur.
+        this.TERRAIN_FILL_DEPTH = 4;
     }
 
     _writeUvarint(n) {
@@ -1299,9 +1308,16 @@ window.Exporter = class Exporter {
             const forceSingleSchem = !!document.getElementById('ap-export-force-single').checked;
 
             confirmBtn.disabled = true;
-            confirmBtn.innerHTML = t('exportGenerating', '⏳ Generating schematic...');
+            const genLabel = t('exportGenerating', '⏳ Generating schematic...');
+            confirmBtn.innerHTML = genLabel;
             try {
-                await this.exportSingleSchem({ filename, foldername, anchor, forceSingleSchem, onlySelectedInstance });
+                await this.exportSingleSchem({
+                    filename, foldername, anchor, forceSingleSchem, onlySelectedInstance,
+                    // Progression visible pendant les gros exports (parties i/n…).
+                    onProgress: (phase, i, n) => {
+                        if (n > 1) confirmBtn.innerHTML = `${genLabel} <span class="hint-text">${i}/${n}</span>`;
+                    }
+                });
                 close();
             } finally {
                 confirmBtn.disabled = false;
@@ -1335,352 +1351,517 @@ window.Exporter = class Exporter {
         modal.classList.remove('hidden');
     }
 
+    /**
+     * Export public (bouton « 📤 Export (Schematic) » / modale).
+     *
+     * Pipeline (même politique que le Terrain Editor et le Schem Placer) :
+     *   1. bornes monde de la scène (terrain + AABB des assets) ;
+     *   2. passe UNIQUE d'accumulation au niveau CHUNK 32³ (Map "cx,cy,cz" →
+     *      Int32Array(32768)) — le terrain est streamé directement depuis les
+     *      structures compactes du TerrainManager et les assets sont transformés
+     *      bloc par bloc. Aucun objet par bloc n'est stocké : l'ancien code
+     *      mettait CHAQUE bloc dans une Map d'objets et dépassait la limite V8
+     *      (~16,7M entrées) → "RangeError: Map maximum size exceeded" ;
+     *   3. si la scène dépasse MAX_CHUNKS_PER_FILE chunks, elle est découpée en
+     *      régions X/Z (formule identique aux deux autres outils :
+     *      tilesParAxe = floor(sqrt(MAX/nYChunks))), chaque région devient un
+     *      .bloxdschem, regroupés dans un .zip avec un guide de chargement.
+     */
     async exportSingleSchem(options = {}) {
-        const targetInstance = options.onlySelectedInstance || null;
         try {
-            const blockMap = new Map();
-
-            const toNum = (val, def = 0) => {
-                const n = Number(val);
-                return (isFinite(n) && !isNaN(n)) ? n : def;
-            };
-
-            const putBlock = (rawBlock, source, instance = null) => {
-                if (!rawBlock) return;
-                if (blockMap.size >= this.HARD_MAX_BLOCKS) return;
-
-                const x = toNum(rawBlock.x);
-                const y = toNum(rawBlock.y);
-                const z = toNum(rawBlock.z);
-                const id = toNum(rawBlock.id);
-
-                if (id === 0) return;
-
-                const key = `${x},${y},${z}`;
-                const existing = blockMap.get(key);
-
-                if (source === 'asset' && existing) {
-                    if (existing.source === 'terrain' && instance && instance.priorityOverTerrain === false) return;
-                    if (existing.source === 'asset' && instance && instance.priorityOverAssets === false) return;
-                }
-
-                blockMap.set(key, {
-                    x, y, z, id,
-                    data: toNum(rawBlock.data, 0),
-                    source,
-                    instanceId: instance ? instance.id : null
-                });
-            };
-
-            let isLargeTerrain = false;
-
-            // === TERRAIN: exact same decision as TerrainManager (skipped if exporting a single asset) ===
-            if (!targetInstance && this.terrainManager &&
-                typeof this.terrainManager.hasTerrain === 'function' &&
-                this.terrainManager.hasTerrain()) {
-
-                const tData = this.terrainManager.terrainData || {};
-                const mode = tData.mode || 'full';
-                const totalBlocks = toNum(tData.totalBlocks || 0);
-                const totalColumns = toNum(tData.totalColumns || 0);
-
-                let area = 0;
-                if (tData.size && tData.size.x && tData.size.z) {
-                    area = toNum(tData.size.x) * toNum(tData.size.z);
-                } else if (totalColumns > 0) {
-                    area = totalColumns * 64;
-                }
-
-                isLargeTerrain =
-                    (mode === 'heightmap-streaming') ||
-                    (area > this.largeAreaThreshold) ||
-                    (totalBlocks > this.largeBlockThreshold);
-
-                // NOTE (correctif) : on n'ampute PLUS le terrain volumineux.
-                // Comme le Terrain Editor, un grand terrain est exporté en entier ;
-                // s'il dépasse la limite de chunks/fichier, la scène complète est
-                // automatiquement découpée en plusieurs .bloxdschem regroupés en .zip
-                // (voir _exportSplitZip). getExportBlocks() renvoie déjà une surface
-                // compacte (1 bloc par colonne) en mode heightmap, donc même une très
-                // grande map streamée reste raisonnable en mémoire.
-                if (isLargeTerrain) {
-                    console.warn('[Exporter] Large/streaming terrain: streaming full terrain into split export (Terrain Editor policy)');
-                }
-
-                if (typeof this.terrainManager.getExportBlocks === 'function') {
-                    try {
-                        const terrainBlocks = this.terrainManager.getExportBlocks();
-                        if (Array.isArray(terrainBlocks)) {
-                            for (const b of terrainBlocks) {
-                                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                                putBlock(b, 'terrain');
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('[Exporter] getExportBlocks failed:', e);
-                    }
-                }
-            }
-
-            // === PLACED ASSETS (with all GitHub transforms) ===
-            const instances = targetInstance
-                ? [targetInstance]
-                : ((this.assetManager && Array.isArray(this.assetManager.instances)) ? this.assetManager.instances : []);
-
-            for (const inst of instances) {
-                if (!inst || typeof inst.name !== 'string') continue;
-                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-
-                let schem = null;
-                try {
-                    schem = this.assetManager.getTemplateSchem(inst.name);
-                } catch (e) { continue; }
-
-                if (!schem || !Array.isArray(schem.blocks) || schem.blocks.length === 0) continue;
-
-                const co = (inst._centerOffset && typeof inst._centerOffset === 'object') ?
-                    inst._centerOffset : { x: 0, z: 0 };
-
-                let hasMesh = false;
-                let wm = null;
-                let tmp = null;
-                try {
-                    if (inst.mesh && typeof inst.mesh.computeWorldMatrix === 'function' && window.BABYLON) {
-                        inst.mesh.computeWorldMatrix(true);
-                        wm = inst.mesh.getWorldMatrix();
-                        tmp = new BABYLON.Vector3();
-                        hasMesh = true;
-                    }
-                } catch (e) {}
-
-                const footprint = (inst.autoTerraform) ? new Map() : null;
-
-                for (const block of schem.blocks) {
-                    if (!block || block.id === 0) continue;
-                    if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-
-                    let wx, wy, wz;
-                    if (hasMesh && wm && tmp) {
-                        try {
-                            tmp.set(
-                                toNum(block.x) - toNum(co.x),
-                                toNum(block.y),
-                                toNum(block.z) - toNum(co.z)
-                            );
-                            BABYLON.Vector3.TransformCoordinatesToRef(tmp, wm, tmp);
-                            wx = Math.round(tmp.x);
-                            wy = Math.round(tmp.y);
-                            wz = Math.round(tmp.z);
-                        } catch (e) {
-                            wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
-                            wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
-                            wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
-                        }
-                    } else {
-                        wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
-                        wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
-                        wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
-                    }
-
-                    putBlock({ x: wx, y: wy, z: wz, id: toNum(block.id), data: toNum(block.data, 0) }, 'asset', inst);
-
-                    if (footprint && blockMap.size < this.HARD_MAX_BLOCKS) {
-                        const k = wx + ',' + wz;
-                        const prev = footprint.get(k);
-                        if (prev === undefined || wy < prev) footprint.set(k, wy);
-                    }
-                }
-
-                // Limited auto-terraform (3 rings, guarded)
-                if (footprint && blockMap.size < this.HARD_MAX_BLOCKS * 0.08) {
-                    const tm = this.terrainManager;
-                    let baseY = Infinity;
-                    for (const y of footprint.values()) if (y < baseY) baseY = y;
-                    if (!isFinite(baseY)) baseY = 0;
-                    const floorY = baseY - 3;
-
-                    const filled = new Set();
-
-                    const fillCol = (wx, wz, topY) => {
-                        if (blockMap.size >= this.HARD_MAX_BLOCKS) return;
-                        let gid = 2;
-                        try {
-                            if (tm && typeof tm.getSurfaceBlockAtWorld === 'function') {
-                                const g = tm.getSurfaceBlockAtWorld(wx, wz);
-                                if (g) gid = g;
-                            }
-                        } catch (e) {}
-                        for (let y = Math.round(topY); y >= Math.round(floorY); y--) {
-                            if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                            putBlock({ x: wx, y: y, z: wz, id: gid, data: 0 }, 'asset', inst);
-                        }
-                    };
-
-                    for (const [k, by] of footprint) {
-                        if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                        const p = k.split(',');
-                        fillCol(+p[0], +p[1], by - 1);
-                        filled.add(k);
-                    }
-
-                    if (blockMap.size < this.HARD_MAX_BLOCKS) {
-                        let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
-                        for (let ring = 1; ring <= 3; ring++) {
-                            if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                            const next = [];
-                            for (const [x, z] of frontier) {
-                                if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                                for (const [dx, dz] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-                                    if (blockMap.size >= this.HARD_MAX_BLOCKS) break;
-                                    const nk = (x + dx) + ',' + (z + dz);
-                                    if (filled.has(nk)) continue;
-                                    filled.add(nk);
-                                    fillCol(x + dx, z + dz, baseY - 1 - ring);
-                                    next.push([x + dx, z + dz]);
-                                }
-                            }
-                            frontier = next;
-                        }
-                    }
-                }
-            }
-
-            const all = Array.from(blockMap.values());
-            if (all.length === 0) {
-                const msg = (window.I18N && window.I18N.t) ? window.I18N.t('noBlocksToExport') : 'No blocks to export!';
-                alert(msg);
-                return;
-            }
-
-            // Garde-fou anti-OOM uniquement : on n'affiche l'avertissement de
-            // troncature que si l'on a réellement atteint la limite mémoire extrême
-            // (jamais en usage normal, car l'export est découpé en .zip ci-dessous).
-            if (blockMap.size >= this.HARD_MAX_BLOCKS) {
-                const t = (window.I18N && window.I18N.t) ? window.I18N.t('exportSplitTruncated') : null;
-                alert(t || 'Export truncated at safety limit. For larger scenes export sections separately.');
-            }
-
-            // Compute bounding box
-            let minX = Infinity, minY = Infinity, minZ = Infinity;
-            let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-
-            for (const b of all) {
-                minX = Math.min(minX, b.x);
-                minY = Math.min(minY, b.y);
-                minZ = Math.min(minZ, b.z);
-                maxX = Math.max(maxX, b.x);
-                maxY = Math.max(maxY, b.y);
-                maxZ = Math.max(maxZ, b.z);
-            }
-
-            if (!isFinite(minX)) {
-                alert('Export failed: invalid bounding box.');
-                return;
-            }
-
-            const sizeX = Math.max(1, maxX - minX + 1);
-            const sizeY = Math.max(1, maxY - minY + 1);
-            const sizeZ = Math.max(1, maxZ - minZ + 1);
-
-            // Regroupe les blocs en chunks 32x32x32 (une seule fois, réutilisé pour
-            // le fichier unique OU pour le découpage en régions ci-dessous).
-            const chunks = this._buildChunkMap(all, minX, minY, minZ);
-            const totalChunks = chunks.size;
-
-            const filename = options.filename || 'bloxd_export';
-            const foldername = options.foldername || 'schematics_decoupes';
-            const forceSingle = !!options.forceSingleSchem;
-
-            if (forceSingle || totalChunks <= this.MAX_CHUNKS_PER_FILE) {
-                // === UN SEUL FICHIER .bloxdschem (comme avant) ===
-                const bytes = this._writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ);
-                this._downloadBinary(bytes, `${filename}.bloxdschem`, 'application/octet-stream');
-            } else {
-                // === Scène trop grande (>180 chunks) : découpage en régions + ZIP ===
-                await this._exportSplitZip(chunks, sizeY, foldername, options.anchor || { x: 0, y: 0, z: 0 });
-            }
-
+            const result = await this._generateExport({
+                filename: options.filename,
+                foldername: options.foldername,
+                targetInstance: options.onlySelectedInstance || null,
+                anchor: options.anchor || { x: 0, y: 0, z: 0 },
+                forceSingle: !!options.forceSingleSchem,
+                onProgress: typeof options.onProgress === 'function' ? options.onProgress : null
+            });
+            if (result) await this._deliverExport(result, options);
         } catch (error) {
             console.error('=== Asset Placer Export Crash ===', error);
             alert('Export failed: ' + (error && error.message ? error.message : error) + '. Check console.');
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    //  Pipeline d'export par chunks (streaming, mémoire bornée)
+    // ─────────────────────────────────────────────────────────────────────
+
     /**
-     * Découpe une scène trop volumineuse (>MAX_CHUNKS_PER_FILE chunks) en plusieurs
-     * fichiers .bloxdschem répartis sur une grille X/Z, regroupés dans un .zip avec
-     * un guide de chargement — même logique que le Terrain Editor.
+     * Source du terrain : bornes monde + itérateur de streaming.
+     *
+     * Ne matérialise JAMAIS tous les blocs :
+     *   • mode 'heightmap' (grande map streamée) : itération directe de la
+     *     colonne par colonne de heightSurface (1 sommet + FILL sous la surface
+     *     + colonnes d'eau) — EXACTEMENT la même surface que
+     *     TerrainManager.getExportBlocks(), sans array d'objets intermédiaire ;
+     *   • mode 'full' : itération de terrainBlocks (liste compacte) ;
+     *   • fallback : getExportBlocks() (modes inconnus / terrains minuscules).
      */
-    async _exportSplitZip(chunks, sizeY, foldername, anchor) {
+    _terrainSource() {
+        const tm = this.terrainManager;
+        const FILL = this.TERRAIN_FILL_DEPTH;
+        const WATER = 126; // id de l'eau (identique à TerrainManager.getExportBlocks)
+        const toNum = (val, def = 0) => { const n = Number(val); return (isFinite(n) && !isNaN(n)) ? n : def; };
+        const ox = Math.round(tm.terrainPosition ? tm.terrainPosition.x : 0);
+        const oy = Math.round(tm.terrainPosition ? tm.terrainPosition.y : 0);
+        const oz = Math.round(tm.terrainPosition ? tm.terrainPosition.z : 0);
+
+        if (tm.mode === 'heightmap' && tm.heightSurface) {
+            const o = tm.heightOrigin || { x: 0, y: 0, z: 0 };
+            const tData = tm.terrainData || {};
+            const sx = Math.max(1, toNum(tData.size && tData.size.x, 1));
+            const sy = Math.max(1, toNum(tData.size && tData.size.y, 1));
+            const sz = Math.max(1, toNum(tData.size && tData.size.z, 1));
+            const bounds = {
+                minX: ox, maxX: ox + sx - 1,
+                minY: oy - FILL,                       // le remplissage descend sous la surface
+                maxY: oy + sy - 1,
+                minZ: oz, maxZ: oz + sz - 1
+            };
+            // L'eau peut culminer/creuser au-delà des sommets solides : on la borne aussi.
+            if (tm.heightWater && tm.heightWater.size > 0) {
+                let wMin = Infinity, wMax = -Infinity;
+                for (const wy of tm.heightWater.values()) {
+                    const w = wy - o.y + oy;
+                    if (w < wMin) wMin = w;
+                    if (w > wMax) wMax = w;
+                }
+                if (isFinite(wMin)) {
+                    if (wMin < bounds.minY) bounds.minY = wMin;
+                    if (wMax > bounds.maxY) bounds.maxY = wMax;
+                }
+            }
+            return {
+                bounds,
+                iterate: async (putBlock, onYield) => {
+                    let n = 0;
+                    for (const [key, c] of tm.heightSurface) {
+                        if (!c) continue;
+                        const p = key.split(',');
+                        const wx = (+p[0]) - o.x + ox;
+                        const wz = (+p[1]) - o.z + oz;
+                        const topY = c.y - o.y + oy;
+                        putBlock(wx, topY, wz, c.id, 'terrain', null);
+                        for (let d = 1; d <= FILL; d++) putBlock(wx, topY - d, wz, c.id, 'terrain', null);
+                        // Garde l'UI vivante sur les très grandes maps.
+                        if ((++n & 0x1fffff) === 0 && onYield) await onYield();
+                    }
+                    for (const [key, wy] of tm.heightWater) {
+                        const p = key.split(',');
+                        putBlock((+p[0]) - o.x + ox, wy - o.y + oy, (+p[1]) - o.z + oz, WATER, 'terrain', null);
+                    }
+                }
+            };
+        }
+
+        if (tm.mode === 'full' && Array.isArray(tm.terrainBlocks) && tm.terrainBlocks.length > 0) {
+            const tData = tm.terrainData || {};
+            const s = tData.size || { x: 1, y: 1, z: 1 };
+            return {
+                bounds: {
+                    minX: ox, maxX: ox + toNum(s.x, 1) - 1,
+                    minY: oy, maxY: oy + toNum(s.y, 1) - 1,
+                    minZ: oz, maxZ: oz + toNum(s.z, 1) - 1
+                },
+                iterate: async (putBlock) => {
+                    for (const b of tm.terrainBlocks) putBlock(b.x + ox, b.y + oy, b.z + oz, b.id, 'terrain', null);
+                }
+            };
+        }
+
+        // Fallback (mode inattendu) : la surface compacte du manager.
+        const list = (typeof tm.getExportBlocks === 'function') ? tm.getExportBlocks() : [];
+        let bMinX = Infinity, bMinY = Infinity, bMinZ = Infinity;
+        let bMaxX = -Infinity, bMaxY = -Infinity, bMaxZ = -Infinity;
+        for (const b of list) {
+            if (b.x < bMinX) bMinX = b.x; if (b.y < bMinY) bMinY = b.y; if (b.z < bMinZ) bMinZ = b.z;
+            if (b.x > bMaxX) bMaxX = b.x; if (b.y > bMaxY) bMaxY = b.y; if (b.z > bMaxZ) bMaxZ = b.z;
+        }
+        return {
+            bounds: isFinite(bMinX)
+                ? { minX: bMinX, minY: bMinY, minZ: bMinZ, maxX: bMaxX, maxY: bMaxY, maxZ: bMaxZ }
+                : null,
+            iterate: async (putBlock) => {
+                for (const b of list) putBlock(b.x, b.y, b.z, b.id, 'terrain', null);
+            }
+        };
+    }
+
+    /**
+     * AABB monde (conservatif) d'une instance : position + empreinte du template
+     * (rotation Y 90°/270° échange W↔D) + marge (arrondis de la matrice monde,
+     * auto-terraform = 3 anneaux).
+     */
+    _instanceWorldAABB(inst) {
+        let schem = null;
+        try { schem = this.assetManager && this.assetManager.getTemplateSchem(inst.name); } catch (e) { /* null */ }
+        let w = 1, h = 1, d = 1;
+        if (schem && schem.size) {
+            w = Math.max(1, Number(schem.size.x) || 1);
+            h = Math.max(1, Number(schem.size.y) || 1);
+            d = Math.max(1, Number(schem.size.z) || 1);
+        }
+        const rot = (((Number(inst.rotationY) || 0) % 360) + 360) % 360;
+        if (rot % 180 === 90) { const t = w; w = d; d = t; }
+        const M = 6; // marge de sécurité
+        const p = inst.position || { x: 0, y: 0, z: 0 };
+        return {
+            minX: p.x - w / 2 - M, maxX: p.x + w / 2 + M,
+            minY: p.y - h - M,    maxY: p.y + h + M,
+            minZ: p.z - d / 2 - M, maxZ: p.z + d / 2 + M
+        };
+    }
+
+    /**
+     * Génère l'export complet (terrain + assets) et retourne :
+     *   { mode: 'single'|'split', files: [{name, bytes, posX, posY, posZ, chunkCount}],
+     *     totalChunks, stats, elapsedMs }
+     * ou null (rien à exporter — alert déjà affichée).
+     */
+    async _generateExport({ targetInstance, anchor, forceSingle, onProgress }) {
+        const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        const CHUNK = this.CHUNK;
+        const toNum = (val, def = 0) => { const n = Number(val); return (isFinite(n) && !isNaN(n)) ? n : def; };
+        const t = (key, fallback) => (window.I18N && window.I18N.t) ? window.I18N.t(key) : fallback;
+        const progress = (phase, i, n) => { if (onProgress) { try { onProgress(phase, i, n); } catch (e) { /* UI only */ } } };
+
+        // ── 1) Sources de la scène ──
+        const instances = targetInstance
+            ? [targetInstance]
+            : ((this.assetManager && Array.isArray(this.assetManager.instances)) ? this.assetManager.instances : []);
+        const includeTerrain = !targetInstance && this.terrainManager
+            && typeof this.terrainManager.hasTerrain === 'function' && this.terrainManager.hasTerrain();
+
+        // ── 2) Bornes monde (terrain + AABB des assets) ──
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        const extend = (bb) => {
+            if (!bb) return;
+            if (bb.minX < minX) minX = bb.minX;
+            if (bb.minY < minY) minY = bb.minY;
+            if (bb.minZ < minZ) minZ = bb.minZ;
+            if (bb.maxX > maxX) maxX = bb.maxX;
+            if (bb.maxY > maxY) maxY = bb.maxY;
+            if (bb.maxZ > maxZ) maxZ = bb.maxZ;
+        };
+        let terrainSrc = null;
+        if (includeTerrain) {
+            terrainSrc = this._terrainSource();
+            extend(terrainSrc.bounds);
+        }
+        for (const inst of instances) {
+            if (!inst || typeof inst.name !== 'string') continue;
+            extend(this._instanceWorldAABB(inst));
+        }
+        if (!isFinite(minX) || !isFinite(maxX)) {
+            alert(t('noBlocksToExport', 'No blocks to export!'));
+            return null;
+        }
+
+        // Origine X/Z alignée sur les frontières de chunk (comme le Schem Placer :
+        // wmx = floor(minX/CHUNK)*CHUNK) → les parties se rejoignent parfaitement.
+        // L'origine Y reste le Y min EXACT de la scène (comportement d'origine :
+        // le bas de la scène se colle à l'ancre Y, toutes parties confondues).
+        const gMinX = Math.floor(minX / CHUNK) * CHUNK;
+        const gMaxX = Math.ceil((maxX + 1) / CHUNK) * CHUNK;
+        const gMinZ = Math.floor(minZ / CHUNK) * CHUNK;
+        const gMaxZ = Math.ceil((maxZ + 1) / CHUNK) * CHUNK;
+        const yMin = Math.round(minY);
+        const yMax = Math.round(maxY);
+        const sizeY = Math.max(1, yMax - yMin + 1);
+        const nCX = Math.max(1, Math.round((gMaxX - gMinX) / CHUNK));
+        const nCZ = Math.max(1, Math.round((gMaxZ - gMinZ) / CHUNK));
+        const nCY = Math.max(1, Math.ceil(sizeY / CHUNK));
+
+        // ── 3) Accumulation au niveau CHUNK (la seule structure stockée) ──
+        // "cx,cy,cz" -> Int32Array(32768). 4 Ko par chunk occupé, quel que soit
+        // le nombre de blocs de la scène (l'ancienne Map d'objets par bloc coûtait
+        // ~100× plus et cassait au-delà de ~16,7M blocs).
+        const chunks = new Map();
+        // "cx,cy,cz" -> Set(indices locaux) des cellules écrites par un ASSET :
+        // nécessaire à la règle de priorité (terrain vs asset vs asset).
+        const assetCells = new Map();
+        const stats = { terrainBlocks: 0, assetBlocks: 0, autoTerraformBlocks: 0, truncated: false };
+        let writtenBlocks = 0;
+
+        const putBlock = (wx, wy, wz, id, source, instance) => {
+            if (id === 0) return;
+            if (writtenBlocks >= this.HARD_MAX_BLOCKS) { stats.truncated = true; return; }
+            wx = Math.round(wx); wy = Math.round(wy); wz = Math.round(wz);
+            const nx = wx - gMinX, ny = wy - yMin, nz = wz - gMinZ;
+            if (nx < 0 || ny < 0 || nz < 0) return; // hors bornes calculées (ne devrait pas arriver)
+            const cx = nx >> 5, cy = ny >> 5, cz = nz >> 5;
+            const key = cx + ',' + cy + ',' + cz;
+            let arr = chunks.get(key);
+            if (!arr) { arr = new Int32Array(this.CHUNK_VOL); chunks.set(key, arr); }
+            const idx = (nx & 31) * 1024 + (ny & 31) * 32 + (nz & 31);
+            if (source === 'asset') {
+                if (arr[idx] !== 0) {
+                    const cells = assetCells.get(key);
+                    const existingIsAsset = !!cells && cells.has(idx);
+                    // Mêmes règles de priorité que l'ancien export :
+                    if (existingIsAsset ? (instance && instance.priorityOverAssets === false)
+                                        : (instance && instance.priorityOverTerrain === false)) return;
+                }
+                let cells = assetCells.get(key);
+                if (!cells) { cells = new Set(); assetCells.set(key, cells); }
+                cells.add(idx);
+            }
+            arr[idx] = id;
+            writtenBlocks++;
+            if (source === 'terrain') stats.terrainBlocks++;
+            else stats.assetBlocks++;
+        };
+
+        progress('building', 0, 1);
+
+        // ── 4) Terrain : streamé depuis les structures compactes du manager ──
+        if (terrainSrc) {
+            await terrainSrc.iterate(putBlock, () => this._yieldToBrowser());
+        }
+
+        // ── 5) Assets placés (mêmes transformations monde + auto-terraform) ──
+        const nInst = instances.length;
+        for (let i = 0; i < nInst; i++) {
+            const inst = instances[i];
+            if (!inst || typeof inst.name !== 'string') continue;
+            if (writtenBlocks >= this.HARD_MAX_BLOCKS) { stats.truncated = true; break; }
+
+            let schem = null;
+            try { schem = this.assetManager.getTemplateSchem(inst.name); } catch (e) { continue; }
+            if (!schem || !Array.isArray(schem.blocks) || schem.blocks.length === 0) continue;
+
+            const co = (inst._centerOffset && typeof inst._centerOffset === 'object') ?
+                inst._centerOffset : { x: 0, z: 0 };
+
+            let hasMesh = false;
+            let wm = null;
+            let tmp = null;
+            try {
+                if (inst.mesh && typeof inst.mesh.computeWorldMatrix === 'function' && window.BABYLON) {
+                    inst.mesh.computeWorldMatrix(true);
+                    wm = inst.mesh.getWorldMatrix();
+                    tmp = new BABYLON.Vector3();
+                    hasMesh = true;
+                }
+            } catch (e) { /* fallback translation simple */ }
+
+            const footprint = inst.autoTerraform ? new Map() : null;
+
+            for (const block of schem.blocks) {
+                if (!block || block.id === 0) continue;
+                if (writtenBlocks >= this.HARD_MAX_BLOCKS) { stats.truncated = true; break; }
+
+                let wx, wy, wz;
+                if (hasMesh && wm && tmp) {
+                    try {
+                        tmp.set(
+                            toNum(block.x) - toNum(co.x),
+                            toNum(block.y),
+                            toNum(block.z) - toNum(co.z)
+                        );
+                        BABYLON.Vector3.TransformCoordinatesToRef(tmp, wm, tmp);
+                        wx = Math.round(tmp.x);
+                        wy = Math.round(tmp.y);
+                        wz = Math.round(tmp.z);
+                    } catch (e) {
+                        wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
+                        wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
+                        wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
+                    }
+                } else {
+                    wx = toNum(inst.position ? inst.position.x : 0) + toNum(block.x);
+                    wy = toNum(inst.position ? inst.position.y : 0) + toNum(block.y);
+                    wz = toNum(inst.position ? inst.position.z : 0) + toNum(block.z);
+                }
+
+                putBlock(wx, wy, wz, toNum(block.id), 'asset', inst);
+
+                if (footprint && writtenBlocks < this.HARD_MAX_BLOCKS) {
+                    const k = wx + ',' + wz;
+                    const prev = footprint.get(k);
+                    if (prev === undefined || wy < prev) footprint.set(k, wy);
+                }
+            }
+
+            // Auto-terraform (socle : empreinte + 3 anneaux) — même algorithme
+            // que l'ancien export, écrit dans les chunks via putBlock (priorités
+            // comprises). NB : l'ancien garde-fou « taille totale < 8% de
+            // HARD_MAX » désactivait silencieusement le socle sur les grandes
+            // maps ; ici c'est le compteur HARD_MAX_BLOCKS (vérifié bloc par
+            // bloc dans fillCol) qui borne le remplissage, donc le socle est
+            // toujours exporté, quelle que soit la taille du terrain.
+            if (footprint && footprint.size > 0) {
+                let baseY = Infinity;
+                for (const y of footprint.values()) if (y < baseY) baseY = y;
+                if (!isFinite(baseY)) baseY = 0;
+                const floorY = baseY - 3;
+                const filled = new Set();
+
+                const fillCol = (fx, fz, topY) => {
+                    let gid = 2;
+                    try {
+                        if (this.terrainManager && typeof this.terrainManager.getSurfaceBlockAtWorld === 'function') {
+                            const g = this.terrainManager.getSurfaceBlockAtWorld(fx, fz);
+                            if (g) gid = g;
+                        }
+                    } catch (e) { /* id par défaut */ }
+                    for (let y = Math.round(topY); y >= Math.round(floorY); y--) {
+                        if (writtenBlocks >= this.HARD_MAX_BLOCKS) { stats.truncated = true; return; }
+                        putBlock(fx, y, fz, gid, 'asset', inst);
+                        stats.autoTerraformBlocks++;
+                    }
+                };
+
+                for (const [k, by] of footprint) {
+                    if (writtenBlocks >= this.HARD_MAX_BLOCKS) break;
+                    const p = k.split(',');
+                    fillCol(+p[0], +p[1], by - 1);
+                    filled.add(k);
+                }
+
+                let frontier = Array.from(footprint.keys()).map(k => k.split(',').map(Number));
+                for (let ring = 1; ring <= 3; ring++) {
+                    if (writtenBlocks >= this.HARD_MAX_BLOCKS) break;
+                    const next = [];
+                    for (const [x, z] of frontier) {
+                        if (writtenBlocks >= this.HARD_MAX_BLOCKS) break;
+                        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                            if (writtenBlocks >= this.HARD_MAX_BLOCKS) break;
+                            const nk = (x + dx) + ',' + (z + dz);
+                            if (filled.has(nk)) continue;
+                            filled.add(nk);
+                            fillCol(x + dx, z + dz, baseY - 1 - ring);
+                            next.push([x + dx, z + dz]);
+                        }
+                    }
+                    frontier = next;
+                }
+            }
+
+            // Garde l'UI vivante pendant les scènes à beaucoup d'assets.
+            if (nInst > 50 && (i % 50 === 49 || i === nInst - 1)) {
+                progress('assets', i + 1, nInst);
+                await this._yieldToBrowser();
+            }
+        }
+
+        // ── 6) Bilan, puis découpage en régions (politique Terrain Editor /
+        //        Schem Placer : régions de floor(sqrt(MAX/nYChunks)) tiles/axe) ──
+        if (chunks.size === 0) {
+            alert(t('noBlocksToExport', 'No blocks to export!'));
+            return null;
+        }
+        if (stats.truncated) {
+            alert(t('exportSplitTruncated',
+                'Export truncated at safety limit. For larger scenes export sections separately.'));
+        }
+        assetCells.clear(); // priorités déjà résolues dans les chunks
+
+        const totalChunks = chunks.size;
+        const elapsedMs = Math.round(
+            ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0
+        );
+        console.log(`[Exporter] Scène accumulée : ${totalChunks} chunks, ${stats.terrainBlocks} blocs terrain, ` +
+            `${stats.assetBlocks} blocs assets (dont ${stats.autoTerraformBlocks} auto-terraform) — ${elapsedMs} ms`);
+
+        const doSplit = !forceSingle && totalChunks > this.MAX_CHUNKS_PER_FILE;
+
+        if (!doSplit) {
+            // === UN SEUL FICHIER .bloxdschem ===
+            progress('writing', 1, 1);
+            const bytes = this._writeBinaryFromChunks(chunks, gMaxX - gMinX, sizeY, gMaxZ - gMinZ);
+            const file = { name: 'full.bloxdschem', bytes, posX: anchor.x, posY: anchor.y, posZ: anchor.z, chunkCount: totalChunks };
+            console.log(`[Exporter] Export mono-fichier : ${file.bytes.length} octets, ${totalChunks} chunks` +
+                (forceSingle ? ` (forcé, au-delà de la limite ${this.MAX_CHUNKS_PER_FILE} chunks)` : ''));
+            return { mode: 'single', anchor, files: [file], totalChunks, stats, elapsedMs: Math.round(
+                ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0
+            ) };
+        }
+
+        // === Découpage en régions X/Z (mêmes formules que les 2 autres outils) ===
+        const mt = Math.max(1, Math.floor(Math.sqrt(this.MAX_CHUNKS_PER_FILE / nCY)));
+        // Répartit les chunks par région (une seule passe).
+        const buckets = new Map(); // "rx,rz" -> Map<chunkKey, Int32Array>
+        for (const [key, arr] of chunks) {
+            const c = key.split(',');
+            const bk = Math.floor((+c[0]) / mt) + ',' + Math.floor((+c[2]) / mt);
+            let m = buckets.get(bk);
+            if (!m) { m = new Map(); buckets.set(bk, m); }
+            m.set(key, arr);
+        }
+        const regions = [];
+        for (const bk of buckets.keys()) {
+            const p = bk.split(',');
+            regions.push([+p[0], +p[1]]);
+        }
+        regions.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+        const files = [];
+        let partNum = 1;
+        for (let ri = 0; ri < regions.length; ri++) {
+            const [rx, rz] = regions[ri];
+            const stx = rx * mt, etx = Math.min(nCX, stx + mt);
+            const stz = rz * mt, etz = Math.min(nCZ, stz + mt);
+
+            const regionMap = buckets.get(rx + ',' + rz);
+            // Clés relocalisées dans la région (X/Z locaux, Y global → toutes les
+            // parties partagent la même étendue Y, donc se superposent correctement).
+            const regionChunks = new Map();
+            for (const [key, arr] of regionMap) {
+                const c = key.split(',').map(Number);
+                regionChunks.set((c[0] - stx) + ',' + c[1] + ',' + (c[2] - stz), arr);
+            }
+            const bytes = this._writeBinaryFromChunks(regionChunks, (etx - stx) * CHUNK, sizeY, (etz - stz) * CHUNK);
+
+            // Libère les chunks de la région dès que sa partie est écrite.
+            for (const key of regionMap.keys()) chunks.delete(key);
+            buckets.delete(rx + ',' + rz);
+
+            const posX = anchor.x + stx * CHUNK;
+            const posY = anchor.y;
+            const posZ = anchor.z + stz * CHUNK;
+            files.push({
+                name: `${partNum}_[${posX},${posY},${posZ}].bloxdschem`,
+                bytes, posX, posY, posZ, chunkCount: regionChunks.size
+            });
+            partNum++;
+            progress('splitting', ri + 1, regions.length);
+            await this._yieldToBrowser();
+        }
+
+        console.log(`[Exporter] Scène découpée en ${files.length} parties (${totalChunks} chunks) — ` +
+            `total ${Math.round(files.reduce((s, f) => s + f.bytes.length, 0) / 1048576, 1)} Mo de .bloxdschem`);
+        return {
+            mode: 'split', anchor, files, totalChunks, stats,
+            elapsedMs: Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0)
+        };
+    }
+
+    /**
+     * Livrable : téléchargement direct (fichier unique) ou .zip avec guide de
+     * chargement (mêmes consignes que le Terrain Editor : se déplacer entre les
+     * parties, Y constante, etc.).
+     */
+    async _deliverExport(result, options = {}) {
+        const filename = options.filename || 'bloxd_export';
+        const foldername = options.foldername || 'schematics_decoupes';
+
+        if (result.mode === 'single') {
+            this._downloadBinary(result.files[0].bytes, `${filename}.bloxdschem`, 'application/octet-stream');
+            return;
+        }
+
         if (!window.JSZip) {
             const t = (window.I18N && window.I18N.t) ? window.I18N.t('exportZipMissing') : null;
             alert(t || 'JSZip is missing: add the JSZip script tag to asset_placer.html to enable multi-file export.');
             return;
         }
 
-        const CHUNK = this.CHUNK;
-
-        // Étendue réelle en chunks (X/Z) occupée par la scène
-        let minCx = Infinity, maxCx = -Infinity, minCz = Infinity, maxCz = -Infinity;
-        const yChunkSet = new Set();
-        for (const key of chunks.keys()) {
-            const [cx, cy, cz] = key.split(',').map(Number);
-            if (cx < minCx) minCx = cx;
-            if (cx > maxCx) maxCx = cx;
-            if (cz < minCz) minCz = cz;
-            if (cz > maxCz) maxCz = cz;
-            yChunkSet.add(cy);
-        }
-        const tilesX = maxCx - minCx + 1;
-        const tilesZ = maxCz - minCz + 1;
-        const nYChunks = Math.max(1, yChunkSet.size);
-
-        // Même formule que le Terrain Editor : régions dimensionnées pour rester
-        // sous la limite de chunks/fichier, quel que soit le nombre de couches Y.
-        const maxTilesPerAxis = Math.max(1, Math.floor(Math.sqrt(this.MAX_CHUNKS_PER_FILE / nYChunks)));
-
-        const files = [];
-        let partNum = 1;
-        for (let stx = minCx; stx <= maxCx; stx += maxTilesPerAxis) {
-            const etx = Math.min(maxCx + 1, stx + maxTilesPerAxis);
-            for (let stz = minCz; stz <= maxCz; stz += maxTilesPerAxis) {
-                const etz = Math.min(maxCz + 1, stz + maxTilesPerAxis);
-
-                const regionChunks = new Map();
-                for (const [key, arr] of chunks) {
-                    const [cx, cy, cz] = key.split(',').map(Number);
-                    if (cx >= stx && cx < etx && cz >= stz && cz < etz) {
-                        regionChunks.set(`${cx - stx},${cy},${cz - stz}`, arr);
-                    }
-                }
-                if (regionChunks.size === 0) continue;
-
-                const regSizeX = (etx - stx) * CHUNK;
-                const regSizeZ = (etz - stz) * CHUNK;
-                const bytes = this._writeBinaryFromChunks(regionChunks, regSizeX, sizeY, regSizeZ);
-
-                const offsetX = (stx - minCx) * CHUNK;
-                const offsetZ = (stz - minCz) * CHUNK;
-                const posX = anchor.x + offsetX;
-                const posY = anchor.y;
-                const posZ = anchor.z + offsetZ;
-                const schemName = `${partNum}_[${posX},${posY},${posZ}]`;
-
-                files.push({ name: `${schemName}.bloxdschem`, bytes, posX, posY, posZ });
-                partNum++;
-            }
-        }
-
-        if (files.length === 0) {
-            alert('Export failed: no blocks found for split.');
-            return;
-        }
-
-        if (files.length === 1) {
-            // Le découpage n'a finalement produit qu'une seule région non-vide
-            this._downloadBinary(files[0].bytes, files[0].name, 'application/octet-stream');
-            return;
-        }
+        const anchor = result.anchor;
+        const files = result.files;
 
         const zip = new window.JSZip();
         const schemFolder = zip.folder(foldername);
@@ -1696,7 +1877,7 @@ window.Exporter = class Exporter {
         guideTxt += "sinon toutes les parties se superposent au même endroit.\n\n";
         guideTxt += "INSTRUCTIONS D'IMPORTATION :\n";
         guideTxt += `1. Placez tous les fichiers .bloxdschem du dossier "${foldername}" dans le répertoire schématiques de Bloxd.\n`;
-        guideTxt += "2. En jeu, rendez-vous à la position de l'angle de collage indiquée dans le nom du 1er fichier.\n";
+        guideTxt += "2. En jeu, rendez-vous à la position de l'angle de collage indiqué dans le nom du 1er fichier.\n";
         guideTxt += "3. Pour chaque fichier ci-dessous, déplacez-vous à la position [posX,posY,posZ] indiquée dans\n";
         guideTxt += "   son nom, PUIS chargez-le :\n\n";
         guideTxt += "🚨 RÈGLE D'OR — ALTITUDE Y CONSTANTE :\n";
@@ -1710,7 +1891,7 @@ window.Exporter = class Exporter {
         files.forEach(f => {
             schemFolder.file(f.name, f.bytes);
             const short = f.name.replace(/\.bloxdschem$/i, '');
-            guideTxt += `   [${short}] Position : X=${f.posX}, Y=${f.posY}, Z=${f.posZ}\n`;
+            guideTxt += `   [${short}] Position : X=${f.posX}, Y=${f.posY}, Z=${f.posZ} (${f.chunkCount} chunks)\n`;
             guideTxt += `   //schematic load ${short}\n\n`;
         });
 
@@ -1727,42 +1908,7 @@ window.Exporter = class Exporter {
         URL.revokeObjectURL(url);
     }
 
-    /** Regroupe une liste de blocs plats (coordonnées monde) en chunks 32³ normalisés. */
-    _buildChunkMap(flatBlocks, minX, minY, minZ) {
-        const CHUNK = this.CHUNK;
-        const CHUNK_VOL = this.CHUNK_VOL;
-        const chunks = new Map(); // "cx,cy,cz" -> Int32Array(CHUNK_VOL)
-
-        const getChunk = (cx, cy, cz) => {
-            const key = cx + ',' + cy + ',' + cz;
-            let arr = chunks.get(key);
-            if (!arr) {
-                arr = new Int32Array(CHUNK_VOL);
-                chunks.set(key, arr);
-            }
-            return arr;
-        };
-
-        for (const b of flatBlocks) {
-            const nx = b.x - minX;
-            const ny = b.y - minY;
-            const nz = b.z - minZ;
-
-            const cx = Math.floor(nx / CHUNK);
-            const cy = Math.floor(ny / CHUNK);
-            const cz = Math.floor(nz / CHUNK);
-
-            const lx = nx - cx * CHUNK;
-            const ly = ny - cy * CHUNK;
-            const lz = nz - cz * CHUNK;
-
-            const arr = getChunk(cx, cy, cz);
-            const idx = lx * 1024 + ly * 32 + lz;
-            arr[idx] = b.id;
-        }
-
-        return chunks;
-    }
+    _yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
 
     /** Sérialise une map de chunks (clés "cx,cy,cz" relatives) en binaire .bloxdschem (Avro + RLE). */
     _writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ) {
@@ -1809,12 +1955,6 @@ window.Exporter = class Exporter {
             offset += p.length;
         }
         return result;
-    }
-
-    /** Conservé pour compatibilité : construit directement le binaire depuis une liste de blocs plats. */
-    _buildBloxdSchemBinary(flatBlocks, minX, minY, minZ, sizeX, sizeY, sizeZ) {
-        const chunks = this._buildChunkMap(flatBlocks, minX, minY, minZ);
-        return this._writeBinaryFromChunks(chunks, sizeX, sizeY, sizeZ);
     }
 
     _downloadBinary(bytes, filename, mime) {

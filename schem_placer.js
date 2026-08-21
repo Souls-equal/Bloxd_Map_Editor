@@ -853,6 +853,8 @@ const i18nMap = {
         split_done: 'Désunion. Il reste {0} union(s) à défaire.',
         schem_loaded: '{0} schem(s) chargé(s).',
         del_fail: '{0} fichier(s) non reconnu(s).',
+        json_converted: '{0} : fichier JSON converti en schématique',
+        format_bad: '{0} : fichier non reconnu (ni .bloxdschem binaire, ni .schem JSON valide).',
         clear_done: 'Scène vidée.',
         loaded_saved: 'Preset chargé : {0} schem(s).',
         preset_saved: 'Preset "{0}" sauvegardé.',
@@ -903,6 +905,8 @@ const i18nMap = {
         split_done: 'Split done. {0} union(s) remaining.',
         schem_loaded: '{0} schem(s) loaded.',
         del_fail: '{0} file(s) not recognized.',
+        json_converted: '{0}: JSON file converted to schematic',
+        format_bad: '{0}: unrecognized file (neither a binary .bloxdschem nor a valid JSON .schem).',
         clear_done: 'Scene cleared.',
         loaded_saved: 'Preset loaded: {0} schem(s).',
         preset_saved: 'Preset "{0}" saved.',
@@ -940,7 +944,7 @@ const i18nMap = {
         ],
     },
     ja: {
-        ready:'準備完了.',locked_msg:'ロック中.',no_sel:'選択なし.',no_union:'2つ以上選択して結合.',no_split:'結合なし.',no_export_sel:'エクスポート対象なし.',export_fail:'エクスポート対象なし.',export_done:'エクスポート: {0} ({1} schem).',export_parts:'{0} パート.',union_done:'"{0}" に結合.',split_done:'分離完了. 残り {0}.',schem_loaded:'{0} schem ロード.',del_fail:'{0} ファイル認識不可.',clear_done:'シーンクリア.',loaded_saved:'プリセット: {0} schem.',preset_saved:'"{0}" 保存.',preset_empty:'プリセットなし.',delete:'削除',save_prompt:'プリセット名:',confirm_clear:'シーンをクリア?',snap:'移動 — クリックで確定',drag_dupe:'複製: ',cut_done:'切断完了.',copy_done:'コピー完了.',
+        ready:'準備完了.',locked_msg:'ロック中.',no_sel:'選択なし.',no_union:'2つ以上選択して結合.',no_split:'結合なし.',no_export_sel:'エクスポート対象なし.',export_fail:'エクスポート対象なし.',export_done:'エクスポート: {0} ({1} schem).',export_parts:'{0} パート.',union_done:'"{0}" に結合.',split_done:'分離完了. 残り {0}.',schem_loaded:'{0} schem ロード.',del_fail:'{0} ファイル認識不可.',json_converted:'{0} : JSONをスケーマに変換しました',format_bad:'{0} : 認識できないファイル（.bloxdschemバイナリでもJSON .schemでもない）.',clear_done:'シーンクリア.',loaded_saved:'プリセット: {0} schem.',preset_saved:'"{0}" 保存.',preset_empty:'プリセットなし.',delete:'削除',save_prompt:'プリセット名:',confirm_clear:'シーンをクリア?',snap:'移動 — クリックで確定',drag_dupe:'複製: ',cut_done:'切断完了.',copy_done:'コピー完了.',
         open:'開く',export:'エクスポート',mode_select:'マウス',mode_move:'移動',mode_scale:'分離',mode_multi:'マルチ',clear:'クリア',
         dim:'寸法',pos:'位置',blocks:'ブロック',color:'色',step:'ステップ:',blocks_unit:'ブロック',shift_hint:'Shiftで×10',rename:'リネーム',
         schems:'Schems',no_schem:'Schemなし. ドラッグまたは',open_hint:'開くをクリック',
@@ -954,7 +958,7 @@ const i18nMap = {
         help_items:['<b>左クリック+ドラッグ</b>: カメラ回転','<b>ホイール</b>: ズーム','<b>右クリック+ドラッグ</b>: パン','<b>WASD/ZQSD</b>: 飛行 — <b>Space/Ctrl</b>: 上昇/下降','<b>ドラッグ&ドロップ</b>: .bloxdschem読込','<b>マウスモード</b> (V): クリック=選択 · ドラッグ=移動 · Ctrl+ドラッグ=複製','<b>移動モード</b> (G): 矢印ドラッグ or WASD(地上) R/C(上下)','<b>分離モード</b> (T): X/Y/Z で面選択 · 矢印で調整 · 切断/複製','🔒ボタン / <kbd>L</kbd>: ロック','<b>マルチ</b> (M): 選択追加 · 結合/分離','<kbd>Del</kbd>: 削除 · <kbd>F</kbd>: 中央 · <kbd>H</kbd>: ヘルプ · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: キャンセル'],
     },
     ko: {
-        ready:'준비됨.',locked_msg:'잠겨 있음.',no_sel:'선택 없음.',no_union:'2개 이상 선택하여 병합.',no_split:'병합 없음.',no_export_sel:'내보낼 스케맨 없음.',export_fail:'내보낼 스케맨 없음.',export_done:'내보냄: {0} ({1}개).',export_parts:'{0}개 파트.',union_done:'"{0}"로 병합.',split_done:'분할 완료. {0}개 남음.',schem_loaded:'{0}개 로드.',del_fail:'{0}개 파일 인식 불가.',clear_done:'씬 비움.',loaded_saved:'프리셋: {0}개.',preset_saved:'"{0}" 저장.',preset_empty:'프리셋 없음.',delete:'삭제',save_prompt:'프리셋 이름:',confirm_clear:'씬을 비우시겠습니까?',snap:'이동 — 클릭하여 확정',drag_dupe:'복제: ',cut_done:'잘라내기 완료.',copy_done:'복사 완료.',
+        ready:'준비됨.',locked_msg:'잠겨 있음.',no_sel:'선택 없음.',no_union:'2개 이상 선택하여 병합.',no_split:'병합 없음.',no_export_sel:'내보낼 스케맨 없음.',export_fail:'내보낼 스케맨 없음.',export_done:'내보냄: {0} ({1}개).',export_parts:'{0}개 파트.',union_done:'"{0}"로 병합.',split_done:'분할 완료. {0}개 남음.',schem_loaded:'{0}개 로드.',del_fail:'{0}개 파일 인식 불가.',json_converted:'{0} : JSON 파일을 스케맨으로 변환했습니다',format_bad:'{0} : 인식할 수 없는 파일(바이너리 .bloxdschem이 아니거나 유효하지 않은 JSON .schem).',clear_done:'씬 비움.',loaded_saved:'프리셋: {0}개.',preset_saved:'"{0}" 저장.',preset_empty:'프리셋 없음.',delete:'삭제',save_prompt:'프리셋 이름:',confirm_clear:'씬을 비우시겠습니까?',snap:'이동 — 클릭하여 확정',drag_dupe:'복제: ',cut_done:'잘라내기 완료.',copy_done:'복사 완료.',
         open:'열기',export:'내보내기',mode_select:'마우스',mode_move:'이동',mode_scale:'분할',mode_multi:'멀티',clear:'비우기',
         dim:'크기',pos:'위치',blocks:'블록',color:'색상',step:'단계:',blocks_unit:'블록',shift_hint:'Shift로 ×10',rename:'이름 변경',
         schems:'스케맨',no_schem:'스케맨 없음. 드래그하거나',open_hint:'열기 클릭',
@@ -968,7 +972,7 @@ const i18nMap = {
         help_items:['<b>좌클릭+드래그</b>: 카메라 회전','<b>휠</b>: 줌','<b>우클릭+드래그</b>: 팬','<b>WASD/ZQSD</b>: 비행 — <b>Space/Ctrl</b>: 상승/하강','<b>드래그&드롭</b>: .bloxdschem 로드','<b>마우스 모드</b> (V): 클릭=선택 · 드래그=이동 · Ctrl+드래그=복제','<b>이동 모드</b> (G): 화살표 드래그 or WASD(지상) R/C(상하)','<b>분할 모드</b> (T): X/Y/Z 면 선택 · 화살표 조정 · 잘라내기/복제','🔒버튼 / <kbd>L</kbd>: 잠금','<b>멀티</b> (M): 선택 추가 · 병합/분할','<kbd>Del</kbd>: 삭제 · <kbd>F</kbd>: 중앙 · <kbd>H</kbd>: 도움말 · <kbd>Shift</kbd>: ×10 · <kbd>Esc</kbd>: 취소'],
     },
     th: {
-        ready:'พร้อม.',locked_msg:'ล็อคอยู่.',no_sel:'ไม่ได้เลือก.',no_union:'เลือกอย่างน้อย 2 อันเพื่อรวม.',no_split:'ไม่มีการรวม.',no_export_sel:'ไม่ได้เลือกสเคมา.',export_fail:'ไม่มีสเคมาส่งออก.',export_done:'ส่งออก: {0} ({1} อัน).',export_parts:'{0} ส่วน.',union_done:'รวมเป็น "{0}".',split_done:'แยกสำเร็จ. เหลือ {0}.',schem_loaded:'โหลด {0} อัน.',del_fail:'{0} ไฟล์ไม่รู้จัก.',clear_done:'ล้างซีน.',loaded_saved:'โหลดพรีเซ็ต: {0} อัน.',preset_saved:'บันทึก "{0}".',preset_empty:'ไม่มีพรีเซ็ต.',delete:'ลบ',save_prompt:'ชื่อพรีเซ็ต:',confirm_clear:'ล้างซีน?',snap:'เคลื่อนย้าย — คลิกเพื่อยืนยัน',drag_dupe:'สำเนา: ',cut_done:'ตัดสำเร็จ.',copy_done:'คัดลอกสำเร็จ.',
+        ready:'พร้อม.',locked_msg:'ล็อคอยู่.',no_sel:'ไม่ได้เลือก.',no_union:'เลือกอย่างน้อย 2 อันเพื่อรวม.',no_split:'ไม่มีการรวม.',no_export_sel:'ไม่ได้เลือกสเคมา.',export_fail:'ไม่มีสเคมาส่งออก.',export_done:'ส่งออก: {0} ({1} อัน).',export_parts:'{0} ส่วน.',union_done:'รวมเป็น "{0}".',split_done:'แยกสำเร็จ. เหลือ {0}.',schem_loaded:'โหลด {0} อัน.',del_fail:'{0} ไฟล์ไม่รู้จัก.',json_converted:'{0} : แปลงไฟล์ JSON เป็นสเคมาแล้ว',format_bad:'{0} : ไฟล์ไม่รู้จัก (ไม่ใช่ .bloxdschem ไบนารีหรือ JSON .schem ที่ถูกต้อง).',clear_done:'ล้างซีน.',loaded_saved:'โหลดพรีเซ็ต: {0} อัน.',preset_saved:'บันทึก "{0}".',preset_empty:'ไม่มีพรีเซ็ต.',delete:'ลบ',save_prompt:'ชื่อพรีเซ็ต:',confirm_clear:'ล้างซีน?',snap:'เคลื่อนย้าย — คลิกเพื่อยืนยัน',drag_dupe:'สำเนา: ',cut_done:'ตัดสำเร็จ.',copy_done:'คัดลอกสำเร็จ.',
         open:'เปิด',export:'ส่งออก',mode_select:'เมาส์',mode_move:'ย้าย',mode_scale:'แยก',mode_multi:'หลายตัว',clear:'ล้าง',
         dim:'ขนาด',pos:'ตำแหน่ง',blocks:'บล็อก',color:'สี',step:'ขั้น:',blocks_unit:'บล็อก',shift_hint:'กด Shift สำหรับ ×10',rename:'เปลี่ยนชื่อ',
         schems:'สเคมา',no_schem:'ไม่มีสเคมา. ลากหรือ',open_hint:'คลิกเปิด',
@@ -1167,14 +1171,17 @@ function encodeChunkRLE(blocks) {
 
 function parseSchem(buffer) {
     const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-    const off = { value: 0 };
+    if (!buf || buf.length < 4) throw new Error('Fichier vide ou tronqué (pas un .bloxdschem).');
 
-    // Header magic 00 00 00 00
+    // Header magic : QUATRE octets 00 00 00 00 (format binaire .bloxdschem / M2B).
+    // Tout autre début = un AUTRE format (fichier .schem JSON, archive zip,
+    // fichier corrompu…) : on rejette proprement au lieu de parser la
+    // « poubelle » (l'ancien code continuait et produisait un faux schématique
+    // géant qui rendait toute la scène inexploitable).
     for (let i = 0; i < 4; i++) {
-        if (buf[off.value] === 0) { off.value++; continue; }
-        console.warn("BloxdSchem: header non nul à l'octet", i);
-        break;
+        if (buf[i] !== 0) throw new Error("Header .bloxdschem invalide (octet " + i + " non nul) — fichier non reconnu.");
     }
+    const off = { value: 4 };
 
     const name = readAvroString(buf, off);
     const px = readAvroInt(buf, off);
@@ -1183,6 +1190,14 @@ function parseSchem(buffer) {
     const sx = readAvroInt(buf, off);
     const sy = readAvroInt(buf, off);
     const sz = readAvroInt(buf, off);
+
+    // Plausibilité du header (fichier corrompu ou mal formé) : un schématique
+    // légitime reste dans ces bornes (le plus gros export du Terrain Editor est
+    // 2048×2048×~256 ; on laisse une marge très large).
+    if ([sx, sy, sz].some(v => v <= 0 || v > 65536) ||
+        [px, py, pz].some(v => Math.abs(v) > 1000000)) {
+        throw new Error('Tailles/position incohérentes dans le header (fichier corrompu ?).');
+    }
 
     const blocks = new Map();
     let totalBlocks = 0;
@@ -1206,6 +1221,7 @@ function parseSchem(buffer) {
             if (nonAir === 0) continue;
             blocks.set(cx + "," + cy + "," + cz, arr);
             totalBlocks += nonAir;
+            if (blocks.size > 100000) throw new Error('Fichier anormalement volumineux (>100000 chunks) — refusé.');
         }
     }
 
@@ -2275,43 +2291,132 @@ function parseOffsetFromName(filename) {
     return null;
 }
 
+/* Détecte le format d'un fichier qui ne commence PAS par le header
+   00 00 00 00 du .bloxdschem binaire : 'zip' (magie PK), 'json' (texte
+   commençant par { ou [ après espaces) ou 'unknown'. */
+function detectForeignFormat(buf) {
+    if (buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && (buf[2] === 0x03 || buf[2] === 0x05)) return 'zip';
+    const head = new TextDecoder('utf-8').decode(buf.subarray(0, Math.min(buf.length, 512)));
+    const t = head.trimStart();
+    if (t.startsWith('{') || t.startsWith('[')) return 'json';
+    return 'unknown';
+}
+
+/* .schem JSON texte (format Asset Placer : {size, blocks:[{x,y,z,id}]} ou
+   tableau nu) → même Map de chunks normalisée que le parser binaire. */
+function parseJsonSchem(buf, baseName) {
+    const text = new TextDecoder('utf-8').decode(buf);
+    let parsed;
+    try { parsed = JSON.parse(text); }
+    catch (e) { throw new Error('JSON invalide : ' + e.message); }
+    let list = null;
+    if (Array.isArray(parsed)) list = parsed;
+    else if (parsed && Array.isArray(parsed.blocks)) list = parsed.blocks;
+    else if (parsed && Array.isArray(parsed.data)) list = parsed.data;
+    if (!list) {
+        if (parsed && Array.isArray(parsed.instances)) throw new Error('Ceci est un export de SCÈNE Asset Placer (instances), pas un schématique.');
+        throw new Error('JSON sans liste de blocs (blocks[]) — format non supporté.');
+    }
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    for (const b of list) {
+        if (!b || !b.id) continue;
+        if (b.x < minX) minX = b.x; if (b.y < minY) minY = b.y; if (b.z < minZ) minZ = b.z;
+        if (b.x > maxX) maxX = b.x; if (b.y > maxY) maxY = b.y; if (b.z > maxZ) maxZ = b.z;
+    }
+    if (!isFinite(minX)) throw new Error('Schem vide (aucun bloc).');
+    const normBlocks = new Map();
+    let totalBlocks = 0;
+    for (const b of list) {
+        if (!b || !b.id) continue;
+        const nx = b.x - minX, ny = b.y - minY, nz = b.z - minZ;
+        const ncx = Math.floor(nx / CHUNK), ncy = Math.floor(ny / CHUNK), ncz = Math.floor(nz / CHUNK);
+        const nkey = ncx + ',' + ncy + ',' + ncz;
+        let nArr = normBlocks.get(nkey);
+        if (!nArr) { nArr = new Int32Array(CHUNK_VOL); normBlocks.set(nkey, nArr); }
+        nArr[(nx - ncx * CHUNK) * 1024 + (ny - ncy * CHUNK) * 32 + (nz - ncz * CHUNK)] = b.id;
+        totalBlocks++;
+        if (normBlocks.size > 100000) throw new Error('Schem anormalement volumineux (>100000 chunks) — refusé.');
+    }
+    const sizeX = maxX - minX + 1, sizeY = maxY - minY + 1, sizeZ = maxZ - minZ + 1;
+    return {
+        name: baseName, version: 0,
+        rawPos: { x: 0, y: 0, z: 0 }, rawSize: { x: sizeX, y: sizeY, z: sizeZ },
+        blocks: normBlocks, nonEmptyChunks: normBlocks.size, totalBlocks,
+        aabb: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
+        size: { x: sizeX, y: sizeY, z: sizeZ }
+    };
+}
+
+/* Charge un fichier (toute extension) → renvoie le nombre d'instances
+   chargées (0 = échec, raison détaillée dans la console). */
 async function addFromBytes(buf, filename, forcedPos) {
-    const base = (filename||'schem').replace(/\.(bloxdschem|schem|bin)$/i,'');
+    const base = (filename||'schem').replace(/\.(bloxdschem|schem|bin|json)$/i,'');
+    const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     let schem;
-    try { schem = await parseSchemAsync(buf, base); }
-    catch(e) { console.error(e); schem = null; }
-    if (!schem) { console.warn('Impossible de parser : ' + base); return null; }
+    const isBinary = u8.length >= 4 && u8[0] === 0 && u8[1] === 0 && u8[2] === 0 && u8[3] === 0;
+    if (isBinary) {
+        try { schem = await parseSchemAsync(u8, base); }
+        catch(e) { console.error(e); schem = null; }
+        if (!schem) console.warn('Impossible de parser le .bloxdschem : ' + filename);
+    } else {
+        // Ce n'est PAS un .bloxdschem binaire → détecte ce que c'est vraiment.
+        const foreign = detectForeignFormat(u8);
+        if (foreign === 'zip') {
+            console.warn(filename + ' : archive ZIP détectée — extraction automatique.');
+            return await loadZipFromBuffer(buf, filename);
+        }
+        if (foreign === 'json') {
+            try { schem = parseJsonSchem(u8, base); }
+            catch (e) { console.warn('Schem JSON non reconnu (' + filename + ') : ' + e.message); return 0; }
+            console.log(i18n('json_converted', base) + ' (' + schem.totalBlocks + ' blocs).');
+        } else {
+            console.warn(i18n('format_bad', filename) +
+                " (attendu : binaire .bloxdschem commençant par 4 octets 00, .schem JSON, ou zip)");
+            return 0;
+        }
+    }
+    if (!schem || !schem.totalBlocks) { console.warn('Schem vide : ' + filename); return 0; }
     if (!schem.name || !schem.name.length) schem.name = base;
     addInstance(base, schem, forcedPos || null);
-    return schem;
+    return 1;
 }
 
 async function loadFiles(files) {
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0; const fails = [];
     for (const f of files) {
         try {
             const low = f.name.toLowerCase();
-            if (low.endsWith('.zip')) { ok += await loadZip(f); }
-            else { const buf = await f.arrayBuffer(); const off = parseOffsetFromName(f.name);
-                const result = await addFromBytes(buf, f.name, off ? { x:off.x, y:0, z:off.z } : null);
-                if (result) ok++; else fail++; }
-        } catch (e) { console.error(e); fail++; }
+            const buf = await f.arrayBuffer();
+            const u8 = new Uint8Array(buf);
+            // .zip (à l'extension), ou archive avec une mauvaise extension (magie PK)
+            const isZip = low.endsWith('.zip') ||
+                (u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4b && (u8[2] === 0x03 || u8[2] === 0x05));
+            if (isZip) {
+                const n = await loadZipFromBuffer(buf, f.name);
+                if (n) ok += n; else { fail++; fails.push(f.name); }
+                continue;
+            }
+            const off = parseOffsetFromName(f.name);
+            const n = await addFromBytes(buf, f.name, off ? { x:off.x, y:0, z:off.z } : null);
+            if (n) ok += n; else { fail++; fails.push(f.name); }
+        } catch (e) { console.error(e); fail++; fails.push(f.name); }
     }
-    if (fail) alert(i18n('del_fail', fail));
+    if (fail) alert(i18n('del_fail', fail) + (fails.length ? ' (' + fails.join(', ') + ')' : ''));
     if (ok) setStatus(i18n('schem_loaded', ok));
 }
 
-async function loadZip(file) {
+async function loadZipFromBuffer(buf, zipName) {
     if (typeof JSZip === 'undefined') { alert('JSZip manquant'); return 0; }
-    const zip = await JSZip.loadAsync(file);
+    const zip = await JSZip.loadAsync(buf);
     let count = 0; const entries = [];
     zip.forEach((rel, entry) => { if (entry.dir) return; const l = rel.toLowerCase();
-        if (l.endsWith('.bloxdschem')||l.endsWith('.schem')||l.endsWith('.bin')) entries.push({ name: rel.split('/').pop(), entry });
+        if (l.endsWith('.bloxdschem')||l.endsWith('.schem')||l.endsWith('.bin')||l.endsWith('.json')) entries.push({ name: rel.split('/').pop(), entry });
     });
     for (const {name, entry} of entries) {
-        try { const buf = await entry.async('arraybuffer'); const off = parseOffsetFromName(name);
-            const result = await addFromBytes(buf, name, off ? { x:off.x, y:0, z:off.z } : null); if (result) count++; }
-        catch(e) { console.warn('Échec',name,e); }
+        try { const b = await entry.async('arraybuffer'); const off = parseOffsetFromName(name);
+            count += await addFromBytes(b, name, off ? { x:off.x, y:0, z:off.z } : null); }
+        catch(e) { console.warn('Échec', name, e); }
     }
     return count;
 }
