@@ -1030,8 +1030,13 @@ window.Exporter = class Exporter {
         this.largeAreaThreshold = 512 * 512;
         this.largeBlockThreshold = 350000;
 
-        // Hard safety cap
-        this.HARD_MAX_BLOCKS = 18000;
+        // No hard truncation: comme le Terrain Editor, on n'ampute plus la scène.
+        // Les scènes trop grandes (>MAX_CHUNKS_PER_FILE chunks) sont automatiquement
+        // découpées en plusieurs .bloxdschem regroupés dans un .zip (voir _exportSplitZip).
+        // Ce garde-fou très haut n'existe que pour éviter un OOM navigateur sur une
+        // scène pathologique (des dizaines de millions de blocs) ; en pratique il
+        // n'est jamais atteint car l'export streame par chunks.
+        this.HARD_MAX_BLOCKS = 80000000;
 
         // Minimal BloxdIO writers (inlined for self-contained .bloxdschem export)
         this.CHUNK = 32;
@@ -1260,7 +1265,6 @@ window.Exporter = class Exporter {
                 });
             };
 
-            let terrainSkipped = false;
             let isLargeTerrain = false;
 
             // === TERRAIN: exact same decision as TerrainManager (skipped if exporting a single asset) ===
@@ -1285,14 +1289,18 @@ window.Exporter = class Exporter {
                     (area > this.largeAreaThreshold) ||
                     (totalBlocks > this.largeBlockThreshold);
 
+                // NOTE (correctif) : on n'ampute PLUS le terrain volumineux.
+                // Comme le Terrain Editor, un grand terrain est exporté en entier ;
+                // s'il dépasse la limite de chunks/fichier, la scène complète est
+                // automatiquement découpée en plusieurs .bloxdschem regroupés en .zip
+                // (voir _exportSplitZip). getExportBlocks() renvoie déjà une surface
+                // compacte (1 bloc par colonne) en mode heightmap, donc même une très
+                // grande map streamée reste raisonnable en mémoire.
                 if (isLargeTerrain) {
-                    terrainSkipped = true;
-                    console.warn('[Exporter] Large/streaming terrain (TerrainManager policy) - skipping terrain for .bloxdschem export');
-                    const msg = (window.I18N && window.I18N.t)
-                        ? window.I18N.t('largeTerrainExportSkipped')
-                        : 'Le terrain en mode streaming est trop volumineux pour un export .bloxdschem en un seul fichier. Export des assets placés uniquement pour le moment.';
-                    alert(msg);
-                } else if (typeof this.terrainManager.getExportBlocks === 'function') {
+                    console.warn('[Exporter] Large/streaming terrain: streaming full terrain into split export (Terrain Editor policy)');
+                }
+
+                if (typeof this.terrainManager.getExportBlocks === 'function') {
                     try {
                         const terrainBlocks = this.terrainManager.getExportBlocks();
                         if (Array.isArray(terrainBlocks)) {
@@ -1301,7 +1309,9 @@ window.Exporter = class Exporter {
                                 putBlock(b, 'terrain');
                             }
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.warn('[Exporter] getExportBlocks failed:', e);
+                    }
                 }
             }
 
@@ -1435,9 +1445,12 @@ window.Exporter = class Exporter {
                 return;
             }
 
+            // Garde-fou anti-OOM uniquement : on n'affiche l'avertissement de
+            // troncature que si l'on a réellement atteint la limite mémoire extrême
+            // (jamais en usage normal, car l'export est découpé en .zip ci-dessous).
             if (blockMap.size >= this.HARD_MAX_BLOCKS) {
                 const t = (window.I18N && window.I18N.t) ? window.I18N.t('exportSplitTruncated') : null;
-                alert(t || 'Export truncated at safety limit (same policy as Terrain Editor). For larger scenes export sections separately.');
+                alert(t || 'Export truncated at safety limit. For larger scenes export sections separately.');
             }
 
             // Compute bounding box

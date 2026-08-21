@@ -2579,10 +2579,31 @@ window.TerrainManager = class TerrainManager {
         if (this.mode === 'heightmap') {
             const out = [], ox = Math.round(this.terrainPosition.x), oy = Math.round(this.terrainPosition.y), oz = Math.round(this.terrainPosition.z);
             const o = this.heightOrigin || { x: 0, y: 0, z: 0 };
+            const WATER = 126;
+            // Profondeur de remplissage sous la surface : sans cela, un terrain
+            // heightmap ne serait qu'une coquille d'un bloc d'épaisseur (surface
+            // flottante) une fois collé dans Bloxd. On remplit quelques blocs vers
+            // le bas — comme le Terrain Editor — pour donner du volume au sol.
+            const FILL_DEPTH = 4;
             if (this.heightSurface) {
                 for (const [key, c] of this.heightSurface) {
                     const p = key.split(',');
-                    out.push({ x: (+p[0]) - o.x + ox, y: c.y - o.y + oy, z: (+p[1]) - o.z + oz, id: c.id, data: 0, source: 'terrain-heightmap' });
+                    const wx = (+p[0]) - o.x + ox;
+                    const wz = (+p[1]) - o.z + oz;
+                    const topY = c.y - o.y + oy;
+                    out.push({ x: wx, y: topY, z: wz, id: c.id, data: 0, source: 'terrain-heightmap' });
+                    for (let d = 1; d <= FILL_DEPTH; d++) {
+                        out.push({ x: wx, y: topY - d, z: wz, id: c.id, data: 0, source: 'terrain-heightmap' });
+                    }
+                }
+            }
+            // Surface d'eau : reproduit l'eau visible dans l'éditeur (colonnes séparées).
+            if (this.heightWater) {
+                for (const [key, wy] of this.heightWater) {
+                    const p = key.split(',');
+                    const wx = (+p[0]) - o.x + ox;
+                    const wz = (+p[1]) - o.z + oz;
+                    out.push({ x: wx, y: wy - o.y + oy, z: wz, id: WATER, data: 0, source: 'terrain-heightmap-water' });
                 }
             }
             return out;
