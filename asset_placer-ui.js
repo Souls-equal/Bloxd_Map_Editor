@@ -1887,7 +1887,14 @@ window.SceneManager = class SceneManager {
             let res = this._tryPlace(data.instances);
             // S'il en manque et que le chargeur de schems tourne encore → on attend puis on réessaie
             if (res.pending.length > 0 && window.appSchematicLoadDone) {
-                await window.appSchematicLoadDone;
+                // try/catch : si le chargeur a rejeté, on NE propage PAS l'erreur —
+                // sinon restore() s'interromprait ici et le filet de sécurité
+                // ensureTemplateLoaded() ci-dessous ne s'exécuterait jamais.
+                try {
+                    await window.appSchematicLoadDone;
+                } catch (e) {
+                    console.warn('[SceneManager] Chargeur de schems en échec ; tentative de récupération à la demande.', e);
+                }
                 const res2 = this._tryPlace(res.pending);
                 res.count += res2.count;
                 res.pending = res2.pending;
@@ -2158,17 +2165,33 @@ window.addEventListener('DOMContentLoaded', () => {
             // On stocke la promesse de chargement pour que le SceneManager puisse
             // l'attendre lors d'un import (fix race condition "import partiel").
             window.appSchematicLoadDone = loader.loadFromProjectFolder();
-            window.appSchematicLoadDone.then(async (count) => {
-                if (count > 0) libraryUI.populateLibrary();
-                // Restaure la session sauvegardée MAINTENANT que les templates sont chargés.
-                if (window.appSceneManager && window.appSceneManager.hasLocalSave()) {
+
+            // Restaure la session sauvegardée. Extrait dans une fonction pour être
+            // appelé QUE le chargeur de schems ait réussi OU échoué : sans cela, un
+            // rejet de loadFromProjectFolder() court-circuitait le .then() et la
+            // session n'était JAMAIS restaurée (aucun asset replacé, silencieusement).
+            const restoreSavedSession = async () => {
+                if (!window.appSceneManager || !window.appSceneManager.hasLocalSave()) return;
+                try {
                     const n = await window.appSceneManager.loadFromLocal();
                     if (n > 0) {
                         const msg = (window.I18N.t('autoRestored') || 'Restored {n} assets').split('{n}').join(n);
                         window.SceneManager.toast(msg, 'success');
                     }
+                } catch (e) {
+                    console.error('[AssetPlacer] Échec de la restauration de session :', e);
                 }
-            });
+            };
+
+            window.appSchematicLoadDone
+                .then((count) => { if (count > 0) libraryUI.populateLibrary(); })
+                .catch((err) => {
+                    // Le chargeur a échoué globalement : on log et on continue quand même.
+                    // Le filet de sécurité ensureTemplateLoaded() de restore() pourra
+                    // encore récupérer les assets un par un.
+                    console.error('[AssetPlacer] Le chargeur de schems a échoué ; restauration de session tentée malgré tout :', err);
+                })
+                .then(restoreSavedSession);
         } else if (window.appSceneManager && window.appSceneManager.hasLocalSave()) {
             // Pas de loader asynchrone : restauration immédiate.
             window.appSceneManager.loadFromLocal();
