@@ -58,6 +58,7 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         let lastMissing = -1;
         const missingRanges = []; // [{start, end}]
         const loadedNums = [];
+        const pending = [];       // n° sautés pour échec transitoire (à réessayer)
 
         for (let n = from; n <= to; n++) {
             const numStr = String(n).padStart(pad, '0');
@@ -65,8 +66,14 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
             const name = `${prefix}${numStr}`;
 
             try {
-                const res = await fetch(fileName, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`${res.status}`);
+                const res = await this._fetchWithRetry(fileName);
+                // Vrai 404 = fichier réellement absent → compte vers l'arrêt anticipé.
+                if (res && res.status === 404) throw new Error('404');
+                // Toute autre réponse non-ok après retries = échec TRANSITOIRE :
+                // on saute ce fichier SANS le compter comme un trou (sinon une série
+                // de hoquets réseau ferait abandonner tout le reste de la plage alors
+                // que les fichiers existent bel et bien).
+                if (!res || !res.ok) { pending.push(n); continue; }
 
                 const buffer = await res.arrayBuffer();
                 const schem = this._parseBuffer(buffer, fileName);
@@ -85,7 +92,7 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
                 if (loaded % 10 === 0 && this.libraryUI) this.libraryUI.populateLibrary();
                 await this._yieldToBrowser();
             } catch (err) {
-                // Fichier manquant (404 ou invalide)
+                // Fichier manquant (404 confirmé) ou invalide → compte vers l'arrêt.
                 consecutiveMisses++;
                 if (firstMissing < 0) firstMissing = n;
                 lastMissing = n;
@@ -96,6 +103,30 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
                     missingRanges.push({ start: firstMissing, end: to });
                     break;
                 }
+            }
+        }
+
+        // 2ᵉ passe : réessaie les fichiers sautés pour échec TRANSITOIRE (jamais
+        // comptés comme trous). Se produit rarement, mais garantit qu'un hoquet
+        // réseau ne laisse pas un asset absent de la bibliothèque.
+        if (pending.length) {
+            for (const n of pending) {
+                const numStr = String(n).padStart(pad, '0');
+                const fileName = `${this.schemsDir}${prefix}${numStr}${ext}`;
+                const name = `${prefix}${numStr}`;
+                try {
+                    const res = await this._fetchWithRetry(fileName, 3);
+                    if (!res || !res.ok) continue;
+                    const buffer = await res.arrayBuffer();
+                    const schem = this._parseBuffer(buffer, fileName);
+                    if (!schem || !schem.blocks || !schem.blocks.length) continue;
+                    const uniqueName = this._makeUniqueTemplateName(name);
+                    const meta = this._normalizeMetadata({ type, file: fileName }, fileName, schem);
+                    this.assetManager.registerTemplate(uniqueName, null, schem, meta);
+                    loaded++;
+                    loadedNums.push(n);
+                } catch (e) { /* définitivement absent */ }
+                await this._yieldToBrowser();
             }
         }
 
@@ -203,10 +234,33 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
 
     async _loadSchematic(path) {
         const fullPath = path.startsWith(this.schemsDir) ? path : this.schemsDir + path;
-        const res = await fetch(fullPath, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`${res.status}`);
+        const res = await this._fetchWithRetry(fullPath);
+        if (!res || !res.ok) throw new Error(res ? `${res.status}` : 'network');
         const buffer = await res.arrayBuffer();
         return this._parseBuffer(buffer, path);
+    }
+
+    /**
+     * fetch robuste : distingue un vrai 404 (fichier absent) d'un échec
+     * TRANSITOIRE (erreur réseau, 429, 5xx) que l'on réessaie avec un petit
+     * backoff. Un 404 est renvoyé tel quel (pas de retry, c'est définitif).
+     * Renvoie la Response, ou null si toutes les tentatives réseau ont échoué.
+     */
+    async _fetchWithRetry(url, attempts = 2) {
+        let lastRes = null;
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const res = await fetch(url, { cache: 'no-store' });
+                if (res.status === 404) return res;              // absence confirmée
+                if (res.ok) return res;                          // succès
+                lastRes = res;                                   // 5xx/429 → retry
+            } catch (e) {
+                lastRes = null;                                  // erreur réseau → retry
+            }
+            // Petit backoff avant de réessayer (sauf après la dernière tentative)
+            if (i < attempts - 1) await new Promise(r => setTimeout(r, 120 * (i + 1)));
+        }
+        return lastRes;
     }
 
     _parseBuffer(buffer, path) {
@@ -356,6 +410,43 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
     }
 
     _yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
+
+    /**
+     * Charge à la demande UN template précis par son nom (ex: "house087"),
+     * en tentant de récupérer directement schems/<name>.bloxdschem.
+     * Sert de filet de sécurité à la restauration de session : si un asset
+     * sauvegardé n'a pas été chargé par le balayage de manifest (hoquet réseau,
+     * arrêt anticipé…), on va chercher son fichier exact. Renvoie true si le
+     * template est disponible après l'appel.
+     */
+    async ensureTemplateLoaded(name) {
+        if (!name) return false;
+        if (this.assetManager.hasTemplate(name)) return true;
+
+        // Candidats de chemins : nom tel quel + variantes d'extension supportées.
+        const candidates = [];
+        if (/\.(bloxdschem|json|schem)$/i.test(name)) {
+            candidates.push(`${this.schemsDir}${name}`);
+        } else {
+            for (const ext of this.supportedExtensions) candidates.push(`${this.schemsDir}${name}${ext}`);
+        }
+
+        for (const fullPath of candidates) {
+            try {
+                const res = await this._fetchWithRetry(fullPath, 3);
+                if (!res || !res.ok) continue;               // 404 → essaie l'extension suivante
+                const buffer = await res.arrayBuffer();
+                const schem = this._parseBuffer(buffer, fullPath);
+                if (!schem || !schem.blocks || !schem.blocks.length) continue;
+                // Enregistre SOUS LE NOM EXACT demandé pour que hasTemplate(name) matche.
+                const meta = this._normalizeMetadata({ file: fullPath }, fullPath, schem);
+                this.assetManager.registerTemplate(name, null, schem, meta);
+                if (this.libraryUI) this.libraryUI.populateLibrary();
+                return true;
+            } catch (e) { /* essaie le candidat suivant */ }
+        }
+        return false;
+    }
 };
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -1800,6 +1891,22 @@ window.SceneManager = class SceneManager {
                 const res2 = this._tryPlace(res.pending);
                 res.count += res2.count;
                 res.pending = res2.pending;
+            }
+            // FILET DE SÉCURITÉ : pour les assets encore introuvables, on tente de
+            // charger leur fichier exact à la demande (schems/<name>.bloxdschem).
+            // Corrige le bug "N asset(s) introuvable(s)" quand un hoquet réseau ou
+            // l'arrêt anticipé du balayage manifest avait empêché leur chargement.
+            if (res.pending.length > 0) {
+                const loader = window.appSchematicLibraryLoader;
+                if (loader && typeof loader.ensureTemplateLoaded === 'function') {
+                    const uniqueNames = [...new Set(res.pending.map(p => p.name))];
+                    for (const nm of uniqueNames) {
+                        try { await loader.ensureTemplateLoaded(nm); } catch (e) {}
+                    }
+                    const res3 = this._tryPlace(res.pending);
+                    res.count += res3.count;
+                    res.pending = res3.pending;
+                }
             }
             if (res.pending.length > 0) {
                 const names = res.pending.map(p => p.name);
