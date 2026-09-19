@@ -355,64 +355,106 @@ function initPreview(){
     let _localDirty=true;
     camera.onViewMatrixChangedObservable.add(()=>{_localDirty=true;});
     engine.runRenderLoop(()=>{
+        // Construction progressive du preview en attente (voir renderPreview) :
+        // étale la boucle sur plusieurs frames pour ne pas freezer au chargement.
+        const built=_processPreviewQueue(6);
         // IMPORTANT : on force le rendu si une touche de déplacement est enfoncée.
         // Sinon, quand la caméra est immobile (_localDirty=false), scene.render() ne tourne
         // plus → onBeforeRenderObservable (qui gère ZQSD/WASD + Ctrl/Space) ne s'exécute
         // jamais → le clavier semblait "freezer" tant qu'on ne bougeait pas la souris.
         const mv=inputMap['z']||inputMap['w']||inputMap['s']||inputMap['q']||inputMap['a']||inputMap['d']||inputMap[' ']||inputMap['control'];
-        if(_localDirty||_needsRender||mv){_localDirty=false;_needsRender=false;scene.render();}
+        if(_localDirty||_needsRender||built||mv){_localDirty=false;_needsRender=false;scene.render();}
     });
     window.addEventListener('resize',()=>engine.resize());
 }
 
 let _hlMesh=null,_hlVUnit=null,_hlBaseC=null,_blockUnit=null;
+// Perf : construction progressive (comme le Terrain Editor) -- un gros schem à
+// splitter peut représenter des centaines de milliers de voxels ; on étale la
+// boucle sur plusieurs frames (budget de temps) au lieu d'un bloc synchrone qui
+// freezait le chargement. La caméra se cadre immédiatement (indépendant du
+// maillage) ; le mesh se remplit derrière, avec un aperçu visible en direct.
+let _previewJob=null;
+function _previewApplyPartial(job,final){
+    if(job.pi===0)return;
+    let colors=job.allC;
+    if(final&&job.hasHl){
+        colors=new Float32Array(job.ci);
+        for(let j=0;j<job.vo;j++){
+            if(job.vUnit[j]===job.highlightIdx){colors[j*4]=job.allC[j*4];colors[j*4+1]=job.allC[j*4+1];colors[j*4+2]=job.allC[j*4+2];colors[j*4+3]=1;}
+            else{colors[j*4]=job.allC[j*4]*0.14;colors[j*4+1]=job.allC[j*4+1]*0.14;colors[j*4+2]=job.allC[j*4+2]*0.14;colors[j*4+3]=1;}
+        }
+    }
+    const vd=new BABYLON.VertexData();
+    vd.positions=job.allP.subarray(0,job.pi);vd.indices=job.allI.subarray(0,job.ii);
+    vd.normals=job.allN.subarray(0,job.ni);vd.colors=colors.subarray(0,job.ci);
+    vd.applyToMesh(job.mesh,true);
+    job.mesh.refreshBoundingInfo();
+    _needsRender=true;
+}
+function _processPreviewQueue(budgetMs){
+    const job=_previewJob;
+    if(!job)return false;
+    const t0=performance.now();
+    let did=false;
+    while(job.cursor<job.entries.length){
+        const[key,id]=job.entries[job.cursor++];
+        const[x,y,z]=key.split(',').map(Number);
+        did=true;
+        // Perf : un voxel entouré des 6 côtés n'a aucune face visible -> on saute
+        // son cube. Gros gain sur les volumes pleins (avant : lag au chargement).
+        if(!(job.set.has((x+1)+','+y+','+z)&&job.set.has((x-1)+','+y+','+z)&&
+             job.set.has(x+','+(y+1)+','+z)&&job.set.has(x+','+(y-1)+','+z)&&
+             job.set.has(x+','+y+','+(z+1))&&job.set.has(x+','+y+','+(z-1)))){
+            const ui=(job.units&&job.bUnit.has(key))?job.bUnit.get(key):-1;
+            const vivid=(ui>=0)?job.uColors[ui%job.uColors.length]:new BABYLON.Color3(((blockColor(id)>>16)&255)/255,((blockColor(id)>>8)&255)/255,(blockColor(id)&255)/255);
+            const bp=job.bp,bi=job.bi,bn=job.bn;
+            for(let i=0;i<bp.length;i+=3){job.allP[job.pi++]=bp[i]+x;job.allP[job.pi++]=bp[i+1]+y;job.allP[job.pi++]=bp[i+2]+z;}
+            for(let i=0;i<bn.length;i++)job.allN[job.ni++]=bn[i];
+            for(let i=0;i<bi.length;i++)job.allI[job.ii++]=bi[i]+job.vo;
+            const nv=bp.length/3;
+            for(let v=0;v<nv;v++){job.allC[job.ci++]=vivid.r;job.allC[job.ci++]=vivid.g;job.allC[job.ci++]=vivid.b;job.allC[job.ci++]=1;job.vUnit[job.vo+v]=ui;}
+            job.vo+=nv;
+        }
+        if((job.cursor&511)===0){
+            _previewApplyPartial(job,false);
+            if(performance.now()-t0>budgetMs)return true;
+        }
+    }
+    // Terminé
+    if(job.pi===0){_needsRender=true;_previewJob=null;return true;}
+    _previewApplyPartial(job,true);
+    _hlMesh=job.mesh;_hlVUnit=job.vUnit.subarray(0,job.vo);_hlBaseC=job.allC.subarray(0,job.ci);
+    _previewJob=null;
+    return true;
+}
 function renderPreview(voxels,units,highlightIdx){
     if(previewMesh){previewMesh.dispose();previewMesh=null;}
-    _hlMesh=null;_hlVUnit=null;_hlBaseC=null;_blockUnit=null;
+    _hlMesh=null;_hlVUnit=null;_hlBaseC=null;_blockUnit=null;_previewJob=null;
     const{set}=voxels;if(!set.size){_needsRender=true;return;}
     const hasHl=highlightIdx!==null&&highlightIdx!==undefined&&highlightIdx>=0;
     const blockCount=set.size;
-    const allP=new Float32Array(blockCount*72);
-    const allI=new Uint32Array(blockCount*36);
-    const allN=new Float32Array(blockCount*72);
-    const allC=new Float32Array(blockCount*96);
-    const vUnit=new Int32Array(blockCount*24);
     const cube=BABYLON.VertexData.CreateBox({size:0.95});
-    const bp=cube.positions,bi=cube.indices,bn=cube.normals;
-    let pi=0,ii=0,ni=0,ci=0,vo=0;
     const uColors=units&&units.length?units.map((_,i)=>{const h=(i*137.5)%360;return BABYLON.Color3.FromHSV(h,0.6,0.9);}):null;
     const bUnit=new Map();
     if(units)units.forEach((u,i)=>u.blocks.forEach(b=>bUnit.set(b.x+','+b.y+','+b.z,i)));
     _blockUnit=units?bUnit:null; // sert au picking 3D : "x,y,z" -> index d'unité
-    for(const[key,id]of set){
-        const[x,y,z]=key.split(',').map(Number);
-        const ui=(units&&bUnit.has(key))?bUnit.get(key):-1;
-        const vivid=(ui>=0)?uColors[ui%uColors.length]:new BABYLON.Color3(((blockColor(id)>>16)&255)/255,((blockColor(id)>>8)&255)/255,(blockColor(id)&255)/255);
-        const col=hasHl?(ui===highlightIdx?vivid:vivid.scale(0.14)):vivid;
-        for(let i=0;i<bp.length;i+=3){allP[pi++]=bp[i]+x;allP[pi++]=bp[i+1]+y;allP[pi++]=bp[i+2]+z;}
-        for(let i=0;i<bn.length;i++)allN[ni++]=bn[i];
-        for(let i=0;i<bi.length;i++)allI[ii++]=bi[i]+vo;
-        const nv=bp.length/3;
-        for(let v=0;v<nv;v++){allC[ci++]=vivid.r;allC[ci++]=vivid.g;allC[ci++]=vivid.b;allC[ci++]=1;vUnit[vo+v]=ui;}
-        vo+=nv;
-    }
-    if(pi===0){_needsRender=true;return;}
-    // allC = couleurs VIVES (base servant de cache). Si highlight → version grisée.
-    let finalC=allC;
-    if(hasHl){
-        finalC=new Float32Array(allC.length);
-        for(let j=0;j<vUnit.length;j++){
-            if(vUnit[j]===highlightIdx){finalC[j*4]=allC[j*4];finalC[j*4+1]=allC[j*4+1];finalC[j*4+2]=allC[j*4+2];finalC[j*4+3]=1;}
-            else{finalC[j*4]=allC[j*4]*0.14;finalC[j*4+1]=allC[j*4+1]*0.14;finalC[j*4+2]=allC[j*4+2]*0.14;finalC[j*4+3]=1;}
-        }
-    }
+
     previewMesh=new BABYLON.Mesh('blk',scene);
-    const vd=new BABYLON.VertexData();vd.positions=allP.subarray(0,pi);vd.indices=allI.subarray(0,ii);
-    vd.normals=allN.subarray(0,ni);vd.colors=finalC.subarray(0,ci);vd.applyToMesh(previewMesh);
     const mat=new BABYLON.StandardMaterial('blkmat'+Date.now(),scene);
     mat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);mat.backFaceCulling=true;mat.useVertexColors=true;
     previewMesh.material=mat;
-    _hlMesh=previewMesh;_hlVUnit=vUnit;_hlBaseC=allC.subarray(0,ci);
+
+    _previewJob={
+        mesh:previewMesh,set,entries:Array.from(set.entries()),cursor:0,
+        allP:new Float32Array(blockCount*72),allI:new Uint32Array(blockCount*36),
+        allN:new Float32Array(blockCount*72),allC:new Float32Array(blockCount*96),
+        vUnit:new Int32Array(blockCount*24),
+        pi:0,ii:0,ni:0,ci:0,vo:0,
+        bp:cube.positions,bi:cube.indices,bn:cube.normals,
+        units,bUnit,uColors,hasHl,highlightIdx
+    };
+
     const e=voxels.extent;const cx=(e.minX+e.maxX)/2,cy=(e.minY+e.maxY)/2,cz=(e.minZ+e.maxZ)/2;
     const sz=Math.max(e.maxX-e.minX,e.maxY-e.minY,e.maxZ-e.minZ)+5;
     camera.position.set(cx+sz,cy+sz*0.6,cz-sz);
@@ -680,9 +722,9 @@ function updateInfo(schem,voxels,units,mergedCount,platformRemoved,autoMerged){
     if(units){
         const smalls=units.filter(u=>u.count<SMALL_THRESHOLD);
         html+=`<hr><div style="display:flex;gap:4px;margin-bottom:6px;">`;
-        html+=`<input id="dl-prefix" value="tree" placeholder="prefix" style="flex:2;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:4px;padding:4px 6px;font-size:11px;">`;
-        html+=`<input id="dl-start" type="number" value="1" style="flex:1;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:4px;padding:4px 6px;font-size:11px;">`;
-        html+=`<input id="dl-zip" value="export" placeholder="zip" style="flex:2;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:4px;padding:4px 6px;font-size:11px;">`;
+        html+=`<input id="dl-prefix" value="tree" placeholder="prefix" style="flex:2;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:2px;padding:4px 6px;font-size:11px;">`;
+        html+=`<input id="dl-start" type="number" value="1" style="flex:1;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:2px;padding:4px 6px;font-size:11px;">`;
+        html+=`<input id="dl-zip" value="export" placeholder="zip" style="flex:2;background:#101218;border:1px solid #3b435b;color:#eef2f8;border-radius:2px;padding:4px 6px;font-size:11px;">`;
         html+=`</div>`;
         html+=`<div><b>${units.length} ${t('unitsDetected')}</b>${smalls.length>0?` <span style="color:#ffb020">(${smalls.length} < 100)</span>`:''}</div>`;
         html+=`<div class="click-hint">💡 ${t('clickHint')}</div>`;

@@ -104,7 +104,7 @@ body, html {
 }
 ::-webkit-scrollbar-thumb {
     background: var(--border-color);
-    border-radius: 3px;
+    border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
     background: var(--accent-cyan);
@@ -120,11 +120,11 @@ body, html {
     overflow: hidden;
 }
 
-/* Panel gauche (~35%) */
+/* Panel gauche (redimensionnable, compact par défaut pour maximiser la vue 3D/2D) */
 #app-panel {
-    width: 36%;
-    min-width: 280px;
-    max-width: 70%;
+    width: 23%;
+    min-width: 230px;
+    max-width: 55%;
     height: 100%;
     background-color: var(--bg-panel);
     display: flex;
@@ -152,7 +152,7 @@ body, html {
     width: 2px;
     height: 36px;
     background-color: var(--border-color);
-    border-radius: 1px;
+    border-radius: 2px;
 }
 #splitter-vertical:hover, #splitter-vertical:active {
     background-color: rgba(56, 189, 248, 0.25);
@@ -196,8 +196,8 @@ body, html {
     backdrop-filter: blur(6px);
     border: 1px solid var(--border-color);
     color: var(--text-muted);
-    padding: 7px 14px;
-    border-radius: 8px;
+    padding: 5px 10px;
+    border-radius: 2px;
     font-size: 0.86rem;
     font-weight: 600;
     cursor: pointer;
@@ -230,7 +230,7 @@ body, html {
    EN-TÊTE DU PANEL & ONGLETS
    ========================================== */
 .panel-header {
-    padding: 16px 20px 10px;
+    padding: 10px 12px 8px 46px; /* laisse la place au bouton Accueil fixe (coin haut-gauche) */
     background-color: var(--bg-panel);
     border-bottom: 1px solid var(--border-color);
 }
@@ -238,20 +238,20 @@ body, html {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 1.25rem;
+    font-size: 1.05rem;
     font-weight: 700;
     letter-spacing: -0.5px;
     color: #fff;
-    margin-bottom: 14px;
+    margin-bottom: 8px;
 }
 .app-title .logo-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
-    border-radius: 8px;
+    border-radius: 2px;
     color: #0a0c12;
     font-size: 1.1rem;
     box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
@@ -261,7 +261,7 @@ body, html {
     gap: 8px;
     background-color: var(--bg-input);
     padding: 4px;
-    border-radius: 8px;
+    border-radius: 2px;
 }
 .tab-btn {
     flex: 1;
@@ -271,7 +271,7 @@ body, html {
     color: var(--text-muted);
     font-size: 0.9rem;
     font-weight: 600;
-    border-radius: 6px;
+    border-radius: 2px;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -310,8 +310,8 @@ body, html {
 .form-section {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 16px;
+    border-radius: 2px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 14px;
@@ -356,7 +356,7 @@ body, html {
     padding: 8px 10px;
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 2px;
     color: #fff;
     font-size: 0.85rem;
     outline: none;
@@ -377,7 +377,7 @@ body, html {
     padding: 0 12px;
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 2px;
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -401,7 +401,7 @@ input[type=range]::-webkit-slider-runnable-track {
     height: 6px;
     cursor: pointer;
     background: var(--bg-input);
-    border-radius: 3px;
+    border-radius: 2px;
     border: 1px solid var(--border-color);
 }
 input[type=range]::-webkit-slider-thumb {
@@ -426,7 +426,7 @@ input[type=range]::-webkit-slider-thumb {
 .biome-card {
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 2px;
     padding: 10px 12px;
     cursor: pointer;
     transition: all 0.2s;
@@ -448,7 +448,7 @@ input[type=range]::-webkit-slider-thumb {
 .biome-color-dot {
     width: 14px;
     height: 14px;
-    border-radius: 4px;
+    border-radius: 2px;
     box-shadow: 0 0 6px rgba(0,0,0,0.5);
 }
 .biome-name {
@@ -466,7 +466,7 @@ input[type=range]::-webkit-slider-thumb {
     background-color: rgba(255,255,255,0.06);
     color: var(--text-muted);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: 2px;
 }
 
 /* Éditeur : Sélection de biome colorés */
@@ -482,7 +482,7 @@ input[type=range]::-webkit-slider-thumb {
     padding: 8px 10px;
     background-color: var(--bg-input);
     border: 2px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 2px;
     color: #fff;
     cursor: pointer;
     font-size: 0.8rem;
@@ -499,7 +499,7 @@ input[type=range]::-webkit-slider-thumb {
 .editor-biome-btn .color-preview {
     width: 16px;
     height: 16px;
-    border-radius: 4px;
+    border-radius: 2px;
     flex-shrink: 0;
 }
 
@@ -520,7 +520,7 @@ input[type=range]::-webkit-slider-thumb {
     padding: 12px 6px;
     background-color: var(--bg-input);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 2px;
     color: var(--text-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -555,7 +555,7 @@ input[type=range]::-webkit-slider-thumb {
     flex: 1;
     padding: 10px 14px;
     border: none;
-    border-radius: 8px;
+    border-radius: 2px;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
@@ -598,7 +598,7 @@ input[type=range]::-webkit-slider-thumb {
 .stats-bar {
     background-color: var(--bg-card);
     border-top: 1px solid var(--border-color);
-    padding: 10px 20px;
+    padding: 6px 14px;
     display: flex;
     justify-content: space-between;
     font-size: 0.75rem;
@@ -632,7 +632,7 @@ input[type=range]::-webkit-slider-thumb {
     backdrop-filter: blur(6px);
     border: 1px solid var(--border-color);
     padding: 6px 12px;
-    border-radius: 6px;
+    border-radius: 2px;
     font-weight: 700;
     font-size: 0.8rem;
     display: flex;
@@ -659,7 +659,7 @@ input[type=range]::-webkit-slider-thumb {
     border: 1px solid var(--border-color);
     color: var(--text-muted);
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: 2px;
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
@@ -692,7 +692,7 @@ input[type=range]::-webkit-slider-thumb {
     backdrop-filter: blur(6px);
     border: 1px solid var(--border-color);
     padding: 5px 10px;
-    border-radius: 6px;
+    border-radius: 2px;
     font-size: 0.75rem;
     font-weight: 600;
 }
@@ -719,7 +719,7 @@ input[type=range]::-webkit-slider-thumb {
 .modal-box {
     background: var(--bg-panel);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 2px;
     width: 90%;
     max-width: 680px;
     max-height: 85vh;
@@ -761,7 +761,7 @@ input[type=range]::-webkit-slider-thumb {
 .code-box {
     background: #080a0f;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 2px;
     padding: 14px;
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.8rem;
@@ -777,3 +777,13 @@ input[type=range]::-webkit-slider-thumb {
     justify-content: flex-end;
     gap: 12px;
 }
+
+/* --- Bouton Accueil : position fixe identique sur les 4 outils --- */
+.home-corner-btn {
+    position: fixed; top: 8px; left: 8px; width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(28,32,44,0.92); border: 1px solid var(--border-color); border-radius: 2px;
+    color: var(--text-main); text-decoration: none; z-index: 9999;
+    backdrop-filter: blur(6px); transition: background .15s, border-color .15s;
+}
+.home-corner-btn:hover { background: rgba(48,56,78,0.95); border-color: var(--accent-cyan); }
