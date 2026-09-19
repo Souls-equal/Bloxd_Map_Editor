@@ -172,6 +172,9 @@ function initBabylon(){
     camera.setTarget(new BABYLON.Vector3(30,10,30));
     camera.inputs.removeByType("FreeCameraKeyboardInput");
     camera.speed=2.0;camera.inertia=0.6;
+    // Distance de rendu généreuse : pas de brouillard ici, mais un gros projet
+    // (plusieurs schems assemblés) peut dépasser le plan d'éloignement par défaut.
+    camera.minZ=0.1;camera.maxZ=50000;
 
     let isLM=false,isRM=false,prevMouse={x:0,y:0};
     canvas.addEventListener("pointerdown",evt=>{
@@ -287,8 +290,39 @@ function initBabylon(){
     if(gizmoEl)gizmoEl.addEventListener('pointerdown',onGizmoPointerDown,true);
     window.addEventListener('resize',()=>{if(engine)engine.resize();});
 
+    // --- Perf : ne pas rendre à plein régime pour rien -------------------------
+    // Rendu plein régime pendant toute interaction (souris/clavier/molette) ou
+    // inertie de caméra, ralenti (~15 FPS) après une courte inactivité. Toute
+    // interaction repasse instantanément à 60 FPS. Le rendu continu à 60 FPS
+    // volait du temps CPU/GPU au thread principal pendant le chargement des
+    // chunks/schems, ce qui se ressentait comme des lags.
+    let _spLastActivity=performance.now();
+    const _spMarkActive=()=>{_spLastActivity=performance.now();};
+    ['pointerdown','pointermove','pointerup','wheel'].forEach(evt=>{
+        canvas.addEventListener(evt,_spMarkActive,{passive:true});
+        window.addEventListener(evt,_spMarkActive,{passive:true});
+    });
+    window.addEventListener('keydown',_spMarkActive,{passive:true});
+    if(camera&&camera.onViewMatrixChangedObservable) camera.onViewMatrixChangedObservable.add(_spMarkActive);
+    let _spFrameSkip=0;
+
     // Render
-    engine.runRenderLoop(()=>{updateGizmo();syncCutHandlesScale();scene.render();});
+    engine.runRenderLoop(()=>{
+        const hidden=document.hidden||!canvas.offsetParent||canvas.clientWidth<8||canvas.clientHeight<8;
+        if(hidden)return;
+        // Construction progressive des maillages en attente (voir buildSchemMesh) :
+        // tant qu'il y a du travail, on la traite avant le rendu et on compte ça
+        // comme de l'activité pour ne pas passer en mode ralenti pendant un gros
+        // chargement (le remplissage progressif doit rester fluide à l'écran).
+        if(_processMeshBuildQueue(6))_spMarkActive();
+        if(performance.now()-_spLastActivity>400){
+            _spFrameSkip=(_spFrameSkip+1)%4;
+            if(_spFrameSkip!==0)return;
+        } else {
+            _spFrameSkip=0;
+        }
+        updateGizmo();syncCutHandlesScale();scene.render();
+    });
 }
 
 /* =========================================
@@ -681,37 +715,98 @@ function adjustCutPlane(axis,delta){
 /* =========================================
    BUILD MESHES (VertexData)
    ========================================= */
+// Perf : file de construction progressive des maillages (même principe que
+// le Terrain Editor) -- le gros du travail (boucle par voxel, potentiellement
+// des centaines de milliers d'itérations sur un gros projet/import) est étalé
+// sur plusieurs frames avec un budget de temps au lieu d'un seul bloc
+// synchrone, ce qui évitait un freeze au chargement d'une "zone énorme".
+// buildSchemMesh()/buildLockedMesh() gardent EXACTEMENT la même signature
+// synchrone (group + mesh créés tout de suite, vides), donc aucun appelant
+// n'a besoin de changer : le maillage se remplit progressivement derrière.
+const _meshBuildQueue = [];
+const _meshCubeData = BABYLON.VertexData.CreateBox({ size: 1 });
+
+function _meshBuildAppendChunk(job, key, arr) {
+    const [ncx, ncy, ncz] = key.split(',').map(Number);
+    const bX = ncx * CHUNK, bY = ncy * CHUNK, bZ = ncz * CHUNK;
+    const bp = _meshCubeData.positions, bi = _meshCubeData.indices, bn = _meshCubeData.normals;
+    for (let lx = 0; lx < CHUNK; lx++) for (let ly = 0; ly < CHUNK; ly++) for (let lz = 0; lz < CHUNK; lz++) {
+        const idx = lx * 1024 + ly * 32 + lz;
+        const bid = arr[idx]; if (bid === AIR_ID) continue;
+        job.totalBlocks++;
+        // Perf : un voxel entouré des 6 côtés (dans le même chunk) n'a aucune face
+        // visible -> on saute la construction de son cube (volumes pleins).
+        if (lx > 0 && lx < CHUNK - 1 && ly > 0 && ly < CHUNK - 1 && lz > 0 && lz < CHUNK - 1 &&
+            arr[idx + 1024] !== AIR_ID && arr[idx - 1024] !== AIR_ID &&
+            arr[idx + 32] !== AIR_ID && arr[idx - 32] !== AIR_ID &&
+            arr[idx + 1] !== AIR_ID && arr[idx - 1] !== AIR_ID) {
+            continue;
+        }
+        const c = job.colorFn(bid);
+        const bx = bX + lx + 0.5, by = bY + ly + 0.5, bz = bZ + lz + 0.5;
+        for (let i = 0; i < bp.length; i += 3) job.allP.push(bp[i] + bx, bp[i + 1] + by, bp[i + 2] + bz);
+        for (let i = 0; i < bn.length; i++) job.allN.push(bn[i]);
+        for (let i = 0; i < bi.length; i++) job.allI.push(bi[i] + job.vo);
+        const nv = bp.length / 3; for (let v = 0; v < nv; v++) job.allC.push(c.r, c.g, c.b, 1.0);
+        job.vo += nv;
+    }
+}
+
+function _meshBuildApply(job) {
+    if (job.allP.length === 0 || !job.mesh || job.mesh.isDisposed()) return;
+    const vd = new BABYLON.VertexData();
+    vd.positions = new Float32Array(job.allP);
+    vd.indices = new Uint32Array(job.allI);
+    if (job.allN.length) vd.normals = new Float32Array(job.allN);
+    vd.colors = new Float32Array(job.allC);
+    vd.applyToMesh(job.mesh, true);
+    job.mesh.refreshBoundingInfo();
+}
+
+function _enqueueMeshBuild(mesh, blocksMap, colorFn) {
+    _meshBuildQueue.push({
+        mesh, chunks: Array.from(blocksMap.entries()), idx: 0,
+        allP: [], allI: [], allN: [], allC: [], vo: 0, totalBlocks: 0, colorFn
+    });
+}
+
+// Appelé depuis la boucle de rendu (voir plus bas) avec un budget en ms.
+// Retourne true si du travail a été fait (utile pour garder le rendu à plein
+// régime pendant qu'un gros maillage se construit encore).
+function _processMeshBuildQueue(budgetMs) {
+    if (!_meshBuildQueue.length) return false;
+    const t0 = performance.now();
+    let did = false;
+    while (_meshBuildQueue.length && performance.now() - t0 < budgetMs) {
+        const job = _meshBuildQueue[0];
+        if (job.idx >= job.chunks.length) {
+            _meshBuildApply(job);
+            _meshBuildQueue.shift();
+            did = true;
+            continue;
+        }
+        const [key, arr] = job.chunks[job.idx++];
+        _meshBuildAppendChunk(job, key, arr);
+        did = true;
+        // Reste visible pendant la construction : on applique la géométrie
+        // accumulée toutes les quelques chunks plutôt qu'à la toute fin.
+        if (job.idx % 3 === 0 || job.idx >= job.chunks.length) _meshBuildApply(job);
+    }
+    return did;
+}
+
 function buildSchemMesh(schem){
     const blocks=schem.blocks;
     if(!blocks||blocks.size===0)return{group:new BABYLON.TransformNode('se',scene),totalBlocks:0,width:0,height:0,depth:0};
     const w=schem.size.x,h=schem.size.y,d=schem.size.z;
+    const tb=schem.totalBlocks||0;
     const group=new BABYLON.TransformNode('sm'+Math.random().toString(36).slice(2,8),scene);
-    const cubeData=BABYLON.VertexData.CreateBox({size:1});
-    const bp=cubeData.positions,bi=cubeData.indices,bn=cubeData.normals;
-    let allP=[],allI=[],allN=[],allC=[];
-    let vo=0,tb=0;
-    blocks.forEach((arr,key)=>{
-        const[ncx,ncy,ncz]=key.split(',').map(Number);
-        const bX=ncx*CHUNK,bY=ncy*CHUNK,bZ=ncz*CHUNK;
-        for(let lx=0;lx<CHUNK;lx++)for(let ly=0;ly<CHUNK;ly++)for(let lz=0;lz<CHUNK;lz++){
-            const bid=arr[lx*1024+ly*32+lz];if(bid===AIR_ID)continue;tb++;
-            const c=getBlockColor(bid);const bx=bX+lx+0.5,by=bY+ly+0.5,bz=bZ+lz+0.5;
-            for(let i=0;i<bp.length;i+=3){allP.push(bp[i]+bx,bp[i+1]+by,bp[i+2]+bz);}
-            for(let i=0;i<bn.length;i++)allN.push(bn[i]);
-            for(let i=0;i<bi.length;i++)allI.push(bi[i]+vo);
-            const nv=bp.length/3;for(let v=0;v<nv;v++)allC.push(c.r,c.g,c.b,1.0);
-            vo+=nv;
-        }
-    });
-    if(allP.length===0)return{group,totalBlocks:0,width:w,height:h,depth:d};
-    const vd=new BABYLON.VertexData();
-    vd.positions=new Float32Array(allP);vd.indices=vo>65535/24?new Uint32Array(allI):new Uint32Array(allI);
-    vd.normals=new Float32Array(allN);vd.colors=new Float32Array(allC);
-    const mesh=new BABYLON.Mesh('sch'+Math.random().toString(36).slice(2,8),scene);vd.applyToMesh(mesh);
+    const mesh=new BABYLON.Mesh('sch'+Math.random().toString(36).slice(2,8),scene);
+    mesh.parent=group;
     const mat=new BABYLON.StandardMaterial('sm'+mesh.name,scene);
     mat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);mat.backFaceCulling=true;mat.useVertexColors=true;mesh.material=mat;
-    mesh.isPickable=true;mesh.metadata={instanceId:null};mesh.parent=group;
-    console.log('Mesh:',tb,'blocks,',w+'x'+h+'x'+d);
+    mesh.isPickable=true;mesh.metadata={instanceId:null};
+    _enqueueMeshBuild(mesh, blocks, getBlockColor);
     return{group,totalBlocks:tb,width:w,height:h,depth:d};
 }
 
@@ -719,28 +814,12 @@ function buildLockedMesh(inst){
     const s=inst.schem,blocks=s.blocks;
     if(!blocks||blocks.size===0)return new BABYLON.TransformNode('le',scene);
     const col=hexToColor3(inst.color);
-    let allP=[],allI=[],allC=[];let vo=0;
-    const cubeData=BABYLON.VertexData.CreateBox({size:1});
-    const bp=cubeData.positions,bi=cubeData.indices;
-    blocks.forEach((arr,key)=>{
-        const[ncx,ncy,ncz]=key.split(',').map(Number);
-        const bX=ncx*CHUNK,bY=ncy*CHUNK,bZ=ncz*CHUNK;
-        for(let lx=0;lx<CHUNK;lx++)for(let ly=0;ly<CHUNK;ly++)for(let lz=0;lz<CHUNK;lz++){
-            if(arr[lx*1024+ly*32+lz]===AIR_ID)continue;
-            const bx=bX+lx+0.5,by=bY+ly+0.5,bz=bZ+lz+0.5;
-            for(let i=0;i<bp.length;i+=3){allP.push(bp[i]+bx,bp[i+1]+by,bp[i+2]+bz);}
-            for(let i=0;i<bi.length;i++)allI.push(bi[i]+vo);
-            const nv=bp.length/3;for(let v=0;v<nv;v++)allC.push(col.r,col.g,col.b,1);
-            vo+=nv;
-        }
-    });
-    if(allP.length===0)return new BABYLON.TransformNode('le',scene);
-    const vd=new BABYLON.VertexData();
-    vd.positions=new Float32Array(allP);vd.indices=new Uint32Array(allI);vd.colors=new Float32Array(allC);
-    const mesh=new BABYLON.Mesh('lm'+inst.id,scene);vd.applyToMesh(mesh);
+    const mesh=new BABYLON.Mesh('lm'+inst.id,scene);
     const mat=new BABYLON.StandardMaterial('lmm'+inst.id,scene);
     mat.specularColor=new BABYLON.Color3(0.05,0.05,0.05);mat.backFaceCulling=true;mat.useVertexColors=true;mesh.material=mat;
-    const group=new BABYLON.TransformNode('lg'+inst.id,scene);mesh.parent=group;return group;
+    const group=new BABYLON.TransformNode('lg'+inst.id,scene);mesh.parent=group;
+    _enqueueMeshBuild(mesh, blocks, () => col);
+    return group;
 }
 
 /* =========================================

@@ -28,7 +28,7 @@
                         <span class="logo-icon"><i class="fas fa-cube"></i></span>
                         <span data-i18n="appTitle">Bloxd Terrain Editor</span>
                     </div>
-                    <a href="index.html" title="⌂ Menu principal" style="background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); width:34px;height:34px;border-radius:20px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:1rem;box-shadow:0 2px 5px rgba(0,0,0,0.2);transition:all 0.2s;">🏠</a>
+                    <a href="index.html" target="_top" class="home-corner-btn" title="⌂ Menu principal">🏠</a>
                 </div>
                 <nav class="tabs-nav">
                     <button class="tab-btn active" id="tab-btn-settings" data-i18n="tabSettings">
@@ -166,7 +166,7 @@
                     </div>
 
                     <!-- FORMULAIRE PALETTE PERSONNALISÉE -->
-                    <div class="form-section" id="palette-form" style="display: none; background: rgba(56, 189, 248, 0.06); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 12px;">
+                    <div class="form-section" id="palette-form" style="display: none; background: rgba(56, 189, 248, 0.06); border: 1px solid var(--accent-cyan); border-radius: 2px; padding: 12px;">
                         <div class="section-title" style="color: var(--accent-cyan);"><i class="fas fa-palette"></i> <span data-i18n="secPaletteForm">Ma Palette Personnalisée</span></div>
                         <div class="form-group">
                             <label class="form-label" data-i18n="labelPaletteName">Nom de la palette</label>
@@ -175,7 +175,7 @@
                         <div class="form-group">
                             <label class="form-label" data-i18n="labelPaletteColor">Couleur (aperçu carte)</label>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <input type="color" id="palette-color" value="#cc5de8" style="width: 46px; height: 34px; border: none; border-radius: 6px; background: none; cursor: pointer;">
+                                <input type="color" id="palette-color" value="#cc5de8" style="width: 46px; height: 34px; border: none; border-radius: 2px; background: none; cursor: pointer;">
                                 <input type="text" class="input-text" id="palette-color-hex" value="#cc5de8" style="flex: 1;">
                             </div>
                         </div>
@@ -221,7 +221,7 @@
                     </div>
 
                     <!-- PARAMÈTRES DE L'OUTIL APLATIR -->
-                    <div class="form-section" id="flatten-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 12px;">
+                    <div class="form-section" id="flatten-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 2px; padding: 12px;">
                         <div class="form-group" style="margin-bottom: 0;">
                             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-muted);">
                                 <input type="checkbox" id="flatten-exact">
@@ -231,7 +231,7 @@
                     </div>
 
                     <!-- PARAMÈTRES DES FORMES (sphère / pavé) -->
-                    <div class="form-section" id="stamp-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 12px;">
+                    <div class="form-section" id="stamp-params" style="display: none; background: rgba(139, 92, 246, 0.06); border: 1px solid var(--accent-purple); border-radius: 2px; padding: 12px;">
                         <div class="section-title" style="color: var(--accent-purple);"><i class="fas fa-cube"></i> <span data-i18n="secStampParams">Taille de la Forme</span></div>
                         <div class="form-group">
                             <label class="form-label"><span data-i18n="labelStampW">Largeur (X, en blocs)</span> <span class="val-badge" id="val-stamp-w">16</span></label>
@@ -272,6 +272,17 @@
                 <button class="btn btn-export" id="btn-download-project" data-i18n="btnDownloadZip">
                     <i class="fas fa-file-export"></i> 👉 Télécharger le projet (ZIP)
                 </button>
+            </div>
+
+            <div style="padding: 0 20px 16px;">
+                <div class="section-title" style="margin-bottom:8px;"><i class="fas fa-people-group"></i> <span data-i18n="secTeamShare">Partage d'équipe</span></div>
+                <div class="action-buttons" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <button class="btn btn-secondary" id="btn-export-project-json" title="Sauvegarde complète (config + biomes + modifications) à partager avec l'équipe" style="flex:1 1 100%;"><i class="fas fa-file-code"></i> <span data-i18n="btnExportProjectJson">Exporter le projet (.json)</span></button>
+                    <button class="btn btn-secondary" id="btn-import-project-json" style="flex:1;"><i class="fas fa-file-import"></i> <span data-i18n="btnImportProjectJson">Importer (.json)</span></button>
+                    <button class="btn btn-secondary" id="btn-import-bloxdschem" title="Reconstruit un terrain (relief) à partir d'un .bloxdschem existant, pour continuer à l'éditer" style="flex:1;"><i class="fas fa-cube"></i> <span data-i18n="btnImportBloxdschem">Importer (.bloxdschem)</span></button>
+                </div>
+                <input type="file" id="input-import-project-json" accept=".json" style="display:none">
+                <input type="file" id="input-import-bloxdschem" accept=".bloxdschem" style="display:none">
             </div>
 
             <footer class="stats-bar">
@@ -350,7 +361,7 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="background: rgba(139, 92, 246, 0.08); border: 1px solid var(--accent-purple); border-radius: 8px; padding: 10px 12px;">
+                <div class="form-group" style="background: rgba(139, 92, 246, 0.08); border: 1px solid var(--accent-purple); border-radius: 2px; padding: 10px 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
                         <input type="checkbox" id="export-pixelated">
                         <span style="font-weight: 600;" data-i18n="modalPixelated">🧊 Style pixelisé (gros blocs texturés)</span>
@@ -360,7 +371,7 @@
                     </p>
                 </div>
 
-                <div class="form-group" style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--accent-green); border-radius: 8px; padding: 10px 12px;">
+                <div class="form-group" style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--accent-green); border-radius: 2px; padding: 10px 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
                         <input type="checkbox" id="export-single-file">
                         <span style="font-weight: 600;" data-i18n="modalSingleFile">📄 Forcer un seul fichier .bloxdschem</span>

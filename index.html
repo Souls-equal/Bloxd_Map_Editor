@@ -6,6 +6,7 @@
     <title>Bloxd Tools</title>
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAKlBMVEVHcEwAAAD///+mBwWPj4+6urr/AgDJBALgEhDdCQcAADVAQEAAANMwMDDLTWdNAAAAAXRSTlMAQObYZgAAAEVJREFUCNdjYMAGGAUgtKBkIYRvOK0dLMRomZYBFmKckZYGFhI2BgJDIEMkSElJ1RHECFwNZUSdxsmIvQthMAoCgQDCZgAI7xCncUnAaQAAAABJRU5ErkJggg==">
     <link rel="stylesheet" href="hub.css">
+    <link rel="stylesheet" href="shell.css">
 </head>
 <body>
 <header>
@@ -20,63 +21,97 @@
     </div>
 </header>
 
-<main>
-    <div class="hero">
-        <h1 data-i18n="hero_title">Choisissez un éditeur</h1>
-        <p data-i18n="hero_sub">Une suite d'outils 3D pour créer, assembler et exporter vos schematics Bloxd.io. Sélectionnez l'éditeur avec lequel vous souhaitez travailler.</p>
+<nav class="tabbar">
+    <button class="tab-btn" data-view="home" style="--tab-color:#eef2f8;"><span class="dot"></span> 🏠 <span data-i18n="tab_home">Accueil</span></button>
+    <button class="tab-btn" data-view="schem" style="--tab-color:#4aa8ff;"><span class="dot"></span> 🧩 Schem Placer</button>
+    <button class="tab-btn" data-view="terrain" style="--tab-color:#3dd48a;"><span class="dot"></span> 🏔️ Terrain Editor</button>
+    <button class="tab-btn" data-view="asset" style="--tab-color:#ffb020;"><span class="dot"></span> 🏗️ Asset Placer</button>
+    <button class="tab-btn" data-view="splitter" style="--tab-color:#cc5de8;"><span class="dot"></span> ✂️ Schem Splitter</button>
+</nav>
+
+<main class="shell-main">
+<div class="views">
+
+    <div id="view-home" class="view">
+        <div class="hero">
+            <h1 data-i18n="hero_title">Choisissez un éditeur</h1>
+            <p data-i18n="hero_sub">Une suite d'outils 3D pour créer, assembler et exporter vos schematics Bloxd.io. Sélectionnez l'éditeur avec lequel vous souhaitez travailler.</p>
+        </div>
+
+        <div class="editor-grid">
+            <div class="editor-card card-color-schem" data-view="schem">
+                <button class="card-help" data-help="schem" title="Aide / Help">❓</button>
+                <div class="card-icon">🧩</div>
+                <div>
+                    <div class="card-tag" data-i18n="schem_tag">Assemblage</div>
+                    <h2>Schem Placer</h2>
+                </div>
+                <p data-i18n="schem_desc">Chargez, déplacez, découpez et fusionnez vos .bloxdschem, puis ré-exportez le tout. Placement précis avec snap magnétique.</p>
+                <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
+            </div>
+
+            <div class="editor-card card-color-terrain" data-view="terrain">
+                <button class="card-help" data-help="terrain" title="Aide / Help">❓</button>
+                <div class="card-icon">🏔️</div>
+                <div>
+                    <div class="card-tag" data-i18n="terrain_tag">Relief</div>
+                    <h2>Terrain Editor</h2>
+                </div>
+                <p data-i18n="terrain_desc">Sculptez et peignez le terrain de votre monde en 3D : élévation, pinceaux, biomes et import/export.</p>
+                <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
+            </div>
+
+            <div class="editor-card card-color-asset" data-view="asset">
+                <button class="card-help" data-help="asset" title="Aide / Help">❓</button>
+                <div class="card-icon">🏗️</div>
+                <div>
+                    <div class="card-tag" data-i18n="asset_tag">Décoration</div>
+                    <h2>Asset Placer</h2>
+                </div>
+                <p data-i18n="asset_desc">Placez des objets, constructions et assets personnalisés sur votre terrain avec une bibliothèque organisée.</p>
+                <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
+            </div>
+
+            <div class="editor-card card-color-splitter" data-view="splitter">
+                <button class="card-help" data-help="splitter" title="Aide / Help">❓</button>
+                <div class="card-icon">✂️</div>
+                <div>
+                    <div class="card-tag" data-i18n="splitter_tag">Preparation</div>
+                    <h2>Schem Splitter</h2>
+                </div>
+                <p data-i18n="splitter_desc">Load a big schem, auto-detect each unit, export them separately in a ZIP.</p>
+                <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
+            </div>
+        </div>
     </div>
 
-    <div class="editor-grid">
-        <a class="editor-card card-color-schem" href="schem_placer.html">
-            <button class="card-help" data-help="schem" title="Aide / Help">❓</button>
-            <div class="card-icon">🧩</div>
-            <div>
-                <div class="card-tag" data-i18n="schem_tag">Assemblage</div>
-                <h2>Schem Placer</h2>
-            </div>
-            <p data-i18n="schem_desc">Chargez, déplacez, découpez et fusionnez vos .bloxdschem, puis ré-exportez le tout. Placement précis avec snap magnétique.</p>
-            <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
-        </a>
-
-        <a class="editor-card card-color-terrain" href="terrain_editor.html">
-            <button class="card-help" data-help="terrain" title="Aide / Help">❓</button>
-            <div class="card-icon">🏔️</div>
-            <div>
-                <div class="card-tag" data-i18n="terrain_tag">Relief</div>
-                <h2>Terrain Editor</h2>
-            </div>
-            <p data-i18n="terrain_desc">Sculptez et peignez le terrain de votre monde en 3D : élévation, pinceaux, biomes et import/export.</p>
-            <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
-        </a>
-
-        <a class="editor-card card-color-asset" href="asset_placer.html">
-            <button class="card-help" data-help="asset" title="Aide / Help">❓</button>
-            <div class="card-icon">🏗️</div>
-            <div>
-                <div class="card-tag" data-i18n="asset_tag">Décoration</div>
-                <h2>Asset Placer</h2>
-            </div>
-            <p data-i18n="asset_desc">Placez des objets, constructions et assets personnalisés sur votre terrain avec une bibliothèque organisée.</p>
-            <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
-        </a>
-
-        <a class="editor-card card-color-splitter" href="schem_splitter.html">
-            <button class="card-help" data-help="splitter" title="Aide / Help">❓</button>
-            <div class="card-icon">✂️</div>
-            <div>
-                <div class="card-tag" data-i18n="splitter_tag">Preparation</div>
-                <h2>Schem Splitter</h2>
-            </div>
-            <p data-i18n="splitter_desc">Load a big schem, auto-detect each unit, export them separately in a ZIP.</p>
-            <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
-        </a>
+    <div id="view-schem" class="view iframe-view">
+        <div class="iframe-loading"><div class="spin"></div><span>Schem Placer…</span></div>
+        <iframe title="Schem Placer"></iframe>
     </div>
+
+    <div id="view-terrain" class="view iframe-view">
+        <div class="iframe-loading"><div class="spin"></div><span>Terrain Editor…</span></div>
+        <iframe title="Terrain Editor"></iframe>
+    </div>
+
+    <div id="view-asset" class="view iframe-view">
+        <div class="iframe-loading"><div class="spin"></div><span>Asset Placer…</span></div>
+        <iframe title="Asset Placer"></iframe>
+    </div>
+
+    <div id="view-splitter" class="view iframe-view">
+        <div class="iframe-loading"><div class="spin"></div><span>Schem Splitter…</span></div>
+        <iframe title="Schem Splitter"></iframe>
+    </div>
+
+</div>
 </main>
 
 <footer>
     <span data-i18n="footer">Bloxd Tools v6.10.0 — Langue et clavier partagés entre tous les éditeurs via le menu</span>
     <b>⚙️ Paramètres</b>.
-    <br><span style="font-size:10.5px;opacity:0.65;">Made with ❤️ by K4miNoK4mi, EPICOO00000 & Arena.ai</span>
+    <br><span style="font-size:10.5px;opacity:0.65;">Made with ❤️ by K4miNoK4mi, EPICOO00000, Arena.ai & Claude (Anthropic)</span>
 </footer>
 
 <!-- Modale Paramètres -->
@@ -118,5 +153,6 @@
 </div>
 
 <script src="hub.js"></script>
+<script src="shell.js"></script>
 </body>
 </html>

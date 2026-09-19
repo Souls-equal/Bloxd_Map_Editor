@@ -1313,10 +1313,28 @@ window.createMeshFromSchem = function(scene, schem) {
     const baseIndices = cubeData.indices;
     const baseNormals = cubeData.normals;
 
+    // Perf : un voxel entouré des 6 côtés n'a aucune face visible -> on ne
+    // construit pas son cube. Gain important sur les gros volumes pleins
+    // (sols, murs épais...) qui généraient des centaines de milliers de
+    // sommets invisibles et bloquaient le thread principal au chargement.
+    const occupied = new Set();
+    for (const block of blocks) {
+        if (!block || block.id === 0) continue;
+        occupied.add((block.x || 0) + ',' + (block.y || 0) + ',' + (block.z || 0));
+    }
+    const isSolid = (x, y, z) => occupied.has(x + ',' + y + ',' + z);
+
     for (const block of blocks) {
         if (!block || block.id === 0) continue;
 
         const bx = block.x || 0, by = block.y || 0, bz = block.z || 0;
+
+        if (isSolid(bx + 1, by, bz) && isSolid(bx - 1, by, bz) &&
+            isSolid(bx, by + 1, bz) && isSolid(bx, by - 1, bz) &&
+            isSolid(bx, by, bz + 1) && isSolid(bx, by, bz - 1)) {
+            continue;
+        }
+
         const color = getBlockColor(block.id);
 
         for (let i = 0; i < basePositions.length; i += 3) {
@@ -1654,6 +1672,10 @@ window.AssetManager = class AssetManager {
 window.setupCamera = function(scene, canvas) {
     const camera = new BABYLON.FreeCamera("camera", new BABYLON.Vector3(0, 15, -20), scene);
     camera.setTarget(BABYLON.Vector3.Zero());
+    // Distance de rendu généreuse : un gros terrain/schem importé peut dépasser
+    // le plan d'éloignement par défaut.
+    camera.minZ = 0.1;
+    camera.maxZ = 50000;
 
     window.updateCameraKeys = function() {
         if (window.I18N && window.I18N.keyboard === 'qwerty') {

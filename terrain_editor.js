@@ -118,6 +118,10 @@ window.I18N = {
             toastRedo: "↪️ Action rétablie (Ctrl+Y)",
             btnReset: "<i class=\"fas fa-trash-alt\"></i> Reset",
             btnSavePreset: "<i class=\"fas fa-save\"></i> Sauver Preset",
+            secTeamShare: "Partage d'équipe",
+            btnExportProjectJson: "Exporter le projet (.json)",
+            btnImportProjectJson: "Importer (.json)",
+            btnImportBloxdschem: "Importer (.bloxdschem)",
             
             secBiomes: "Biomes (cliquer pour défaut)",
             
@@ -280,6 +284,10 @@ window.I18N = {
             toastRedo: "↪️ Action redone (Ctrl+Y)",
             btnReset: "<i class=\"fas fa-trash-alt\"></i> Reset",
             btnSavePreset: "<i class=\"fas fa-save\"></i> Save Preset",
+            secTeamShare: "Team Sharing",
+            btnExportProjectJson: "Export project (.json)",
+            btnImportProjectJson: "Import (.json)",
+            btnImportBloxdschem: "Import (.bloxdschem)",
             
             secBiomes: "Biomes (click for default)",
             
@@ -675,6 +683,94 @@ window.toggleLanguage = function() {
  * Rôle : Générateur procédural de terrain (bruit 2D, biomes, gestion de la grille, outils de peinture/édition)
  * Adapté de generate_terrain.py (M2B / Bloxd.io Format)
  */
+
+/* =====================================================
+   PARSAGE .bloxdschem (format Avro, identique M2B/Bloxd.io)
+   — repris du même décodeur que Schem Placer / Schem Splitter,
+   utilisé ici uniquement pour importer un terrain (voir plus bas
+   TerrainGenerator.importFromBloxdschemBlocks).
+   ===================================================== */
+function teReadUvarint(buf, off) {
+    let x = 0, s = 0, b;
+    for (let i = 0; i < 10; i++) {
+        if (off.value >= buf.length) break;
+        b = buf[off.value++];
+        if (b < 0x80) return x | (b << s);
+        x |= (b & 0x7f) << s;
+        s += 7;
+    }
+    return x;
+}
+function teReadAvroInt(buf, off) {
+    const zz = teReadUvarint(buf, off);
+    return (zz >>> 1) ^ -(zz & 1);
+}
+function teReadAvroBytes(buf, off) {
+    const len = teReadAvroInt(buf, off);
+    if (len < 0 || off.value + len > buf.length) return new Uint8Array(0);
+    const bytes = buf.slice(off.value, off.value + len);
+    off.value += len;
+    return bytes;
+}
+function teDecodeChunkRLE(rleBytes, CHUNK_VOL) {
+    const blocks = new Int32Array(CHUNK_VOL);
+    const pos = { value: 0 };
+    let i = 0;
+    while (i < CHUNK_VOL && pos.value < rleBytes.length) {
+        const count = teReadUvarint(rleBytes, pos);
+        const bid = teReadUvarint(rleBytes, pos);
+        for (let k = 0; k < count && i < CHUNK_VOL; k++) blocks[i++] = bid;
+    }
+    return blocks;
+}
+// Parse un .bloxdschem et rend directement les chunks BRUTS (pas de
+// normalisation de position ici : le centrage est géré à l'import terrain).
+function teParseBloxdschem(buffer) {
+    const CHUNK = 32, CHUNK_VOL = 32768, AIR_ID = 0;
+    const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    if (!buf || buf.length < 4) throw new Error('Fichier vide ou tronqué (pas un .bloxdschem).');
+    for (let i = 0; i < 4; i++) {
+        if (buf[i] !== 0) throw new Error("Header .bloxdschem invalide — fichier non reconnu.");
+    }
+    const off = { value: 4 };
+    const name = (() => { const len = teReadAvroInt(buf, off); if (len < 0 || off.value + len > buf.length) return ''; const bytes = buf.subarray(off.value, off.value + len); off.value += len; return new TextDecoder('utf-8').decode(bytes); })();
+    const px = teReadAvroInt(buf, off), py = teReadAvroInt(buf, off), pz = teReadAvroInt(buf, off);
+    const sx = teReadAvroInt(buf, off), sy = teReadAvroInt(buf, off), sz = teReadAvroInt(buf, off);
+    if ([sx, sy, sz].some(v => v <= 0 || v > 65536) || [px, py, pz].some(v => Math.abs(v) > 1000000)) {
+        throw new Error('Tailles/position incohérentes dans le header (fichier corrompu ?).');
+    }
+    const blocks = new Map();
+    let totalBlocks = 0;
+    while (off.value < buf.length) {
+        let blockCount = teReadAvroInt(buf, off);
+        if (blockCount === 0) break;
+        if (blockCount < 0) { blockCount = -blockCount; teReadAvroInt(buf, off); }
+        for (let i = 0; i < blockCount; i++) {
+            const cx = teReadAvroInt(buf, off), cy = teReadAvroInt(buf, off), cz = teReadAvroInt(buf, off);
+            const rle = teReadAvroBytes(buf, off);
+            const arr = teDecodeChunkRLE(rle, CHUNK_VOL);
+            let nonAir = 0;
+            for (let k = 0; k < arr.length; k++) if (arr[k] !== AIR_ID) nonAir++;
+            if (nonAir === 0) continue;
+            blocks.set((px + cx * CHUNK) + ',' + (py + cy * CHUNK) + ',' + (pz + cz * CHUNK), arr);
+            totalBlocks += nonAir;
+            if (blocks.size > 100000) throw new Error('Fichier anormalement volumineux (>100000 chunks) — refusé.');
+        }
+    }
+    // Bbox réelle (les clés du Map ci-dessus sont déjà en coordonnées MONDE du chunk).
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+    blocks.forEach((arr, key) => {
+        const [bx0, , bz0] = key.split(',').map(Number);
+        for (let lx = 0; lx < CHUNK; lx += CHUNK - 1) for (let lz = 0; lz < CHUNK; lz += CHUNK - 1) {
+            const wx = bx0 + lx, wz = bz0 + lz;
+            if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+            if (wz < minZ) minZ = wz; if (wz > maxZ) maxZ = wz;
+        }
+    });
+    if (!isFinite(minX)) { minX = px; maxX = px; minZ = pz; maxZ = pz; }
+    return { name, blocks, totalBlocks, AIR_ID, CHUNK, sizeX: maxX - minX + 1, sizeZ: maxZ - minZ + 1, minX, minZ };
+}
+
 
 class TerrainGenerator {
     constructor() {
@@ -1965,6 +2061,110 @@ class TerrainGenerator {
         this._editIndexDirty = true;
         // false : ne PAS resynchroniser l'ancienne grille par-dessus les édits du preset !
         this.generateGrid(false);
+    }
+
+    /**
+     * PROJET JSON — sauvegarde/chargement complet pour le partage en équipe.
+     * On ne sauvegarde PAS la grille entière (potentiellement lourde et 100%
+     * déterministe de toute façon) : config + biomes + customEdits suffisent à
+     * reconstruire un terrain IDENTIQUE via generateGrid() (même principe que
+     * loadPreset ci-dessus), donc le fichier reste léger et facile à partager.
+     */
+    exportProjectData() {
+        this.syncGridToCustomEdits();
+        const customEditsObj = {};
+        if (this.customEdits) this.customEdits.forEach((v, k) => { customEditsObj[k] = v; });
+        return {
+            type: 'bloxd-terrain-project',
+            version: 1,
+            savedAt: new Date().toISOString(),
+            config: JSON.parse(JSON.stringify(this.config)),
+            biomes: JSON.parse(JSON.stringify(this.biomes)),
+            customEdits: customEditsObj
+        };
+    }
+
+    importProjectData(data) {
+        if (!data || data.type !== 'bloxd-terrain-project' || !data.config) {
+            throw new Error('Fichier de projet invalide (type inattendu).');
+        }
+        Object.assign(this.config, data.config);
+        if (data.biomes) this.biomes = JSON.parse(JSON.stringify(data.biomes));
+        this.initBiomeRules();
+        if (!this.customEdits) this.customEdits = new Map();
+        this.customEdits.clear();
+        if (data.customEdits) {
+            for (let key in data.customEdits) this.customEdits.set(key, data.customEdits[key]);
+        }
+        this.initPermutationTable(this.config.seed);
+        this._editIndexDirty = true;
+        this.generateGrid(false);
+    }
+
+    /**
+     * IMPORT D'UN TERRAIN DEPUIS UN .bloxdschem — reconstruit un relief (heightmap)
+     * à partir d'un schematic Bloxd.io existant, pour continuer à l'éditer ici.
+     * LIMITE INHÉRENTE : ce logiciel modélise un terrain en 2D (une hauteur +
+     * un biome par colonne x/z), donc surplombs, grottes et structures
+     * suspendues d'un schem 3D quelconque ne peuvent pas survivre à l'import :
+     * seul le bloc solide le plus haut de chaque colonne est conservé.
+     * Les colonnes sont regroupées ("binning") à la résolution de la grille
+     * actuelle pour rester rapide et léger, même sur un très gros fichier.
+     */
+    importFromBloxdschemBlocks(parsed) {
+        const blocksMap = parsed.blocks, AIR_ID = parsed.AIR_ID;
+        if (!blocksMap || blocksMap.size === 0) return { columns: 0 };
+        const stepX = this.config.worldSizeX / (this.config.gridResolution || 256);
+        const stepZ = this.config.worldSizeZ / (this.config.gridResolution || 256);
+        const CH = parsed.CHUNK || 32;
+        // Centre l'empreinte importée sur l'origine (0,0), comme le monde généré.
+        const offX = -(parsed.minX + parsed.sizeX / 2);
+        const offZ = -(parsed.minZ + parsed.sizeZ / 2);
+        // buckets: 'bx,bz' -> { height, blockId }  (on garde le point culminant du bucket)
+        const buckets = new Map();
+        blocksMap.forEach((arr, key) => {
+            const [baseX, baseY, baseZ] = key.split(',').map(Number);
+            for (let lx = 0; lx < CH; lx++) for (let ly = 0; ly < CH; ly++) for (let lz = 0; lz < CH; lz++) {
+                const bid = arr[lx * 1024 + ly * 32 + lz];
+                if (bid === AIR_ID) continue;
+                const wx = baseX + lx + offX, wy = baseY + ly, wz = baseZ + lz + offZ;
+                const bx = Math.round(wx / stepX) * stepX;
+                const bz = Math.round(wz / stepZ) * stepZ;
+                const bkey = bx + ',' + bz;
+                const cur = buckets.get(bkey);
+                if (!cur || wy > cur.height) buckets.set(bkey, { height: wy, blockId: bid, bx, bz });
+            }
+        });
+        if (buckets.size === 0) return { columns: 0 };
+
+        // Table ID Bloxd -> biome (via les blocs déclarés sur chaque biome). Si le
+        // bloc du schem importé n'est pas reconnu, on retombe sur la sélection par
+        // hauteur habituelle du générateur (assignBiomeProcedural).
+        const idToBiome = new Map();
+        for (const key in this.biomes) {
+            const b = this.biomes[key];
+            if (!b.blocks) continue;
+            for (const name of b.blocks) idToBiome.set(this.getBlockId(name), key);
+        }
+
+        // Élargit le monde si besoin pour ne rien perdre de l'empreinte importée.
+        this.config.worldSizeX = Math.max(this.config.worldSizeX, Math.ceil(parsed.sizeX / 10) * 10 + 20);
+        this.config.worldSizeZ = Math.max(this.config.worldSizeZ, Math.ceil(parsed.sizeZ / 10) * 10 + 20);
+
+        if (!this.customEdits) this.customEdits = new Map();
+        this.customEdits.clear();
+        let minH = Infinity, maxH = -Infinity;
+        buckets.forEach(({ height, blockId, bx, bz }) => {
+            const biome = idToBiome.get(blockId) || this.assignBiomeProcedural(height, bx, bz);
+            this.setCustomEdit(bx, bz, height, biome, Math.max(stepX, stepZ) / 2);
+            if (height < minH) minH = height;
+            if (height > maxH) maxH = height;
+        });
+        this.config.minHeight = Math.min(this.config.minHeight, Math.floor(minH));
+        this.config.maxHeight = Math.max(this.config.maxHeight, Math.ceil(maxH));
+        this._editIndexDirty = true;
+        this.generateGrid(false);
+        return { columns: buckets.size, minHeight: minH, maxHeight: maxH };
     }
 
     /**
@@ -3595,7 +3795,10 @@ class Map3D {
         this.scene.useRightHandedSystem = true;
         this.scene.clearColor = BABYLON.Color4.FromHexString('#0f111aFF');
         this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-        this.scene.fogDensity = 0.0012;
+        // Brouillard fortement réduit (était 0.0012 -> voile gênant dès ~800 unités,
+        // donc visible sur la plupart des grands terrains). Sert uniquement à masquer
+        // la limite de la distance de rendu (camera.maxZ), plus le pop-in des chunks.
+        this.scene.fogDensity = 0.00015;
         this.scene.fogColor = BABYLON.Color3.FromHexString('#0f111a');
         // Groupe de rendu 1 = « toujours au-dessus » (depth buffer effacé avant),
         // utilisé par le curseur pinceau (≈ depthTest:false + renderOrder de Three).
@@ -4743,8 +4946,7 @@ class Map3D {
 
         const gen = this.generator;
         if (!gen || !gen.needsDetailChunks || !gen.needsDetailChunks() ||
-            !this._hasTerrain() || !this.camera || !this._geomMeta ||
-            (this._chunkBuildQueue && this._chunkBuildQueue.length > 0)) {
+            !this._hasTerrain() || !this.camera || !this._geomMeta) {
             if (this.detailGroup) this.detailGroup.setEnabled(false);
             this._restoreAllSunk();
             return;
@@ -4779,7 +4981,6 @@ class Map3D {
             this._restoreAllSunk();
             return;
         }
-        this.detailGroup.setEnabled(true);
 
         // POINT REGARDÉ (pick) : le rayon central de la caméra est intersecté
         // avec le terrain ; c'est LE point que le joueur regarde. Fallback : la
@@ -4793,6 +4994,28 @@ class Map3D {
         if (lookX === undefined) { lookX = this.camera.target.x; lookZ = this.camera.target.z; }
         const wcx = (lookX + halfSizeX) / scale * meta.stepX + meta.startWorldX;
         const wcz = (lookZ + halfSizeZ) / scale * meta.stepZ + meta.startWorldZ;
+
+        // FIX : le terrain grossier (coarse) se construit lui aussi par file
+        // budgetée (_chunkBuildQueue). Avant, TOUT chunk coarse encore en file
+        // -- même à l'autre bout de la carte -- désactivait la surcouche de
+        // détail PARTOUT, y compris pile sous la caméra une fois celle-ci
+        // rapprochée. Symptôme rapporté : caméra déplacée puis zoomée -> pas
+        // de détail tant qu'un chunk lointain traînait encore en file. On ne
+        // bloque plus que si le chunk coarse *sous le point regardé* n'est
+        // lui-même pas encore construit (le détail en a besoin comme base).
+        if (this._chunkBuildQueue && this._chunkBuildQueue.length > 0) {
+            const CS = this._chunkCells | 0 || 32;
+            const gx = (wcx - meta.startWorldX) / meta.stepX;
+            const gz = (wcz - meta.startWorldZ) / meta.stepZ;
+            const localCx = Math.floor(gx / CS), localCz = Math.floor(gz / CS);
+            const localEntry = this._chunkIndex.get(localCx + ',' + localCz);
+            if (!localEntry || !localEntry.built) {
+                if (this.detailGroup) this.detailGroup.setEnabled(false);
+                this._restoreAllSunk();
+                return;
+            }
+        }
+        this.detailGroup.setEnabled(true);
 
         const S = gen.detailChunkSize();
         const r = Math.min(radiusBlocks, MAX_RADIUS_BLOCKS);
@@ -5417,6 +5640,7 @@ class UIManager {
         this.initBiomesGrid();
         this.initPresetsAndActions();
         this.initExportModal();
+        this.initTeamShareControls();
     }
 
     /**
@@ -6281,6 +6505,99 @@ class UIManager {
                 btnDownloadZip.innerHTML = '<i class="fas fa-download"></i> Télécharger le fichier .bloxdschem';
             }
         });
+    }
+
+    /**
+     * Partage d'équipe : export/import d'un projet complet en JSON (config +
+     * biomes + modifications), et import d'un terrain depuis un .bloxdschem
+     * existant (reconstruction en heightmap — voir importFromBloxdschemBlocks).
+     */
+    initTeamShareControls() {
+        const btnExportJson = document.getElementById('btn-export-project-json');
+        const btnImportJson = document.getElementById('btn-import-project-json');
+        const inputJson = document.getElementById('input-import-project-json');
+        const btnImportSchem = document.getElementById('btn-import-bloxdschem');
+        const inputSchem = document.getElementById('input-import-bloxdschem');
+
+        const refreshAfterLoad = () => {
+            this.syncUIWithConfig();
+            if (typeof this.renderBiomesList === 'function') this.renderBiomesList();
+            this.generator.rebuildShapeMask();
+            this.map2d.render();
+            this.map3d.updateTerrain();
+            this.updateStatsBar();
+        };
+
+        if (btnExportJson) btnExportJson.addEventListener('click', () => {
+            try {
+                const data = this.generator.exportProjectData();
+                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'terrain_project.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+            } catch (err) {
+                console.error('Erreur export projet JSON:', err);
+                alert('Erreur lors de l\'export du projet.');
+            }
+        });
+
+        if (btnImportJson && inputJson) {
+            btnImportJson.addEventListener('click', () => inputJson.click());
+            inputJson.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (this.generator.saveStateForUndo) this.generator.saveStateForUndo();
+                        this.generator.importProjectData(data);
+                        refreshAfterLoad();
+                    } catch (err) {
+                        console.error('Erreur import projet JSON:', err);
+                        alert('Fichier de projet invalide ou corrompu.');
+                    } finally {
+                        inputJson.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        if (btnImportSchem && inputSchem) {
+            btnImportSchem.addEventListener('click', () => inputSchem.click());
+            inputSchem.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+                const ok = confirm(
+                    "Importer ce .bloxdschem comme terrain va REMPLACER le relief et les modifications actuelles.\n\n" +
+                    "⚠️ Limite : seul le bloc le plus haut de chaque colonne est conservé (pas de surplombs, grottes ou structures suspendues — ce logiciel modélise un terrain en 2D).\n\n" +
+                    "Continuer ?"
+                );
+                if (!ok) { inputSchem.value = ''; return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const parsed = teParseBloxdschem(ev.target.result);
+                        if (this.generator.saveStateForUndo) this.generator.saveStateForUndo();
+                        const res = this.generator.importFromBloxdschemBlocks(parsed);
+                        refreshAfterLoad();
+                        if (!res || !res.columns) alert('Aucun bloc solide trouvé dans ce fichier.');
+                    } catch (err) {
+                        console.error('Erreur import .bloxdschem:', err);
+                        alert('Fichier .bloxdschem invalide ou corrompu : ' + err.message);
+                    } finally {
+                        inputSchem.value = '';
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
     }
 
     getDirectGuideContent() {

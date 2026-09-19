@@ -9,6 +9,7 @@ const I18N = {
     fr: {
         brand_sub: "Suite d'éditeurs",
         settings: "Paramètres",
+        tab_home: "Accueil",
         hero_title: "Choisissez un éditeur",
         hero_sub: "Une suite d'outils 3D pour créer, assembler et exporter vos schematics Bloxd.io. Sélectionnez l'éditeur avec lequel vous souhaitez travailler.",
         schem_tag: "Assemblage",
@@ -78,6 +79,7 @@ const I18N = {
     en: {
         brand_sub: "Editor suite",
         settings: "Settings",
+        tab_home: "Home",
         hero_title: "Choose an editor",
         hero_sub: "A suite of 3D tools to build, assemble and export your Bloxd.io schematics. Pick the editor you want to work with.",
         schem_tag: "Assembly",
@@ -144,7 +146,7 @@ const I18N = {
         ],
     },
     ja: {
-        brand_sub: "エディタスイート", settings: "設定",
+        brand_sub: "エディタスイート", settings: "設定", tab_home: "ホーム",
         hero_title: "エディタを選択",
         hero_sub: "Bloxd.ioのスケマティックを作成、組み立て、エクスポートする3Dツールスイートです。使いたいエディタを選んでください。",
         schem_tag: "アセンブリ", schem_desc: ".bloxdschemを読み込み、移動、分割、結合して再エクスポート。正確な配置。",
@@ -162,7 +164,7 @@ const I18N = {
         help_splitter: ["📂 <b>インポート</b>: 複数アセットを含む.bloxdschemを読込","✂️ <b>検出&分割</b>: 各ユニットを検出","🏢 <b>プラットフォーム自動削除</b>: 全面層(>85%)を除去","📦 <b>ZIP保存</b>: 各ユニット=1ファイル","🖱️ <b>左クリック+ドラッグ</b>: 回転 · <b>右クリック</b>: パン","🖥️ <b>ホイール</b>: ズーム","🎮 <b>WASD/ZQSD</b>: 飛行 · <b>Space/Ctrl</b>: 上昇/下降 · <b>Shift</b>: ×10"],
     },
     ko: {
-        brand_sub: "에디터 모음", settings: "설정",
+        brand_sub: "에디터 모음", settings: "설정", tab_home: "홈",
         hero_title: "에디터 선택",
         hero_sub: "Bloxd.io 스케매틱을 제작, 조립 및 내보내기하는 3D 도구 모음입니다. 원하는 에디터를 선택하세요.",
         schem_tag: "조립", schem_desc: ".bloxdschem 불러오기, 이동, 분할, 병합 후 다시 내보내기. 정밀 배치.",
@@ -180,7 +182,7 @@ const I18N = {
         help_splitter: ["📂 <b>가져오기</b>: 여러 에셋이 포함된 .bloxdschem 로드","✂️ <b>감지&분할</b>: 각 유닛 감지","🏢 <b>플랫폼 자동 제거</b>: 전면 층(>85%) 제거","📦 <b>ZIP 저장</b>: 각 유닛=1 파일","🖱️ <b>좌클릭+드래그</b>: 회전 · <b>우클릭</b>: 팬","🖥️ <b>휠</b>: 줌","🎮 <b>WASD/ZQSD</b>: 비행 · <b>Space/Ctrl</b>: 상승/하강 · <b>Shift</b>: ×10"],
     },
     th: {
-        brand_sub: "ชุดเครื่องมือแก้ไข", settings: "ตั้งค่า",
+        brand_sub: "ชุดเครื่องมือแก้ไข", settings: "ตั้งค่า", tab_home: "หน้าแรก",
         hero_title: "เลือกเครื่องมือ",
         hero_sub: "ชุดเครื่องมือ 3D สำหรับสร้าง ประกอบ และส่งออกสเคมาติก Bloxd.io เลือกเครื่องมือที่ต้องการใช้",
         schem_tag: "ประกอบ", schem_desc: "โหลด ย้าย ตัด และรวมไฟล์ .bloxdschem แล้วส่งออกใหม่ จัดวางอย่างแม่นยำ",

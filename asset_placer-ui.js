@@ -523,7 +523,7 @@ window.LibraryUI = class LibraryUI {
                     <button id="btn-export-single" class="ui-btn primary"><span data-i18n="export">📤 Export (Schematic)</span></button>
                 </div>
                 <div class="toolbar-right">
-                    <a href="index.html" class="ui-btn" title="⌂ Menu principal">🏠</a>
+                    <a href="index.html" target="_top" class="home-corner-btn" title="⌂ Menu principal">🏠</a>
                 </div>
             </div>
         `;
@@ -2385,7 +2385,35 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const scene = createScene();
 
-    engine.runRenderLoop(() => scene.render());
+    // --- Perf : ne pas rendre à plein régime pour rien -------------------------
+    // Avant : engine.runRenderLoop(() => scene.render()) tournait à 60 FPS en
+    // continu, même caméra totalement immobile et rien à l'écran qui change.
+    // Ce travail GPU/CPU permanent vole du temps au thread principal pendant
+    // le chargement des assets/chunks, ce qui se ressent comme des lags.
+    // Ici : rendu plein régime pendant toute interaction (souris/clavier/
+    // molette) ou inertie de caméra, puis ralenti (~15 FPS) après une courte
+    // inactivité. La moindre interaction repasse instantanément à 60 FPS.
+    let _apLastActivity = performance.now();
+    const _apMarkActive = () => { _apLastActivity = performance.now(); };
+    ['pointerdown', 'pointermove', 'pointerup', 'wheel'].forEach(evt => {
+        canvas.addEventListener(evt, _apMarkActive, { passive: true });
+    });
+    window.addEventListener('keydown', _apMarkActive, { passive: true });
+    if (scene.activeCamera && scene.activeCamera.onViewMatrixChangedObservable) {
+        scene.activeCamera.onViewMatrixChangedObservable.add(_apMarkActive);
+    }
+    let _apFrameSkip = 0;
+    engine.runRenderLoop(() => {
+        const hidden = document.hidden || !canvas.offsetParent || canvas.clientWidth < 8 || canvas.clientHeight < 8;
+        if (hidden) return;
+        if (performance.now() - _apLastActivity > 400) {
+            _apFrameSkip = (_apFrameSkip + 1) % 4;
+            if (_apFrameSkip !== 0) return;
+        } else {
+            _apFrameSkip = 0;
+        }
+        scene.render();
+    });
 
     window.addEventListener('resize', resizeBabylon, { passive: true });
     window.addEventListener('orientationchange', resizeBabylon, { passive: true });
