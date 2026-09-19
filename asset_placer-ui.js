@@ -523,7 +523,7 @@ window.LibraryUI = class LibraryUI {
                     <button id="btn-export-single" class="ui-btn primary"><span data-i18n="export">📤 Export (Schematic)</span></button>
                 </div>
                 <div class="toolbar-right">
-                    <a href="index.html" target="_top" class="home-corner-btn" title="⌂ Menu principal">🏠</a>
+                    <a href="index.html?view=home" target="_top" class="home-corner-btn" title="⌂ Menu principal" onclick="try{localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.localStorage) window.top.localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.BloxdToolsHub && window.top.BloxdToolsHub.goHome){event.preventDefault(); window.top.BloxdToolsHub.goHome();} else if(window.top){try{window.top.postMessage({type:'bloxdTools:goHome'},'*');}catch(e){}}}catch(e){}">🏠</a>
                 </div>
             </div>
         `;
