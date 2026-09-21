@@ -10,6 +10,26 @@ const TOOLS = {
     splitter: 'schem_splitter.html',
 };
 
+function getViewFromUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const v = params.get('view');
+        if (v) return v;
+        if (params.has('home')) return 'home';
+        const hashRaw = window.location.hash.replace(/^#/, '');
+        if (hashRaw) {
+            // direct view name in hash
+            if (TOOLS[hashRaw] || hashRaw === 'home') return hashRaw;
+            try {
+                const hp = new URLSearchParams(hashRaw);
+                if (hp.get('view')) return hp.get('view');
+                if (hp.has('home')) return 'home';
+            } catch (e) {}
+        }
+    } catch (e) {}
+    return null;
+}
+
 function activateView(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + id));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === id));
@@ -37,9 +57,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Ouvre directement sur le dernier outil utilisé, sinon l'accueil.
+    // Mais si l'URL demande explicitement une vue (ex: ?view=home depuis le bouton 🏠 d'un éditeur), on respecte l'URL.
+    let urlView = getViewFromUrl();
     let start = 'home';
-    try { start = localStorage.getItem('bloxdTools.lastView') || 'home'; } catch (e) {}
+    if (urlView) {
+        start = urlView;
+        // Nettoie l'URL pour éviter de rester en ?view=home
+        try { history.replaceState(null, '', window.location.pathname); } catch (e) {}
+    } else {
+        try { start = localStorage.getItem('bloxdTools.lastView') || 'home'; } catch (e) {}
+    }
     if (!TOOLS[start] && start !== 'home') start = 'home';
     activateView(start);
+
+    // Permet aux iframes (éditeurs) de demander le retour au hub via postMessage
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (!data) return;
+        const type = typeof data === 'string' ? data : data.type;
+        if (type === 'bloxdTools:goHome' || type === 'goHome' || data === 'goHome') {
+            activateView('home');
+        }
+    });
 });
+
+// Expose une API pour que les iframes puissent aussi appeler parent.BloxdToolsHub.goHome() si même origine
+window.BloxdToolsHub = {
+    goHome: () => activateView('home'),
+    activateView
+};
 })();

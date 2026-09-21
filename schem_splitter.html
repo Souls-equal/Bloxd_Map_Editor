@@ -9,7 +9,7 @@
 </head>
 <body>
     <div id="topbar">
-        <a class="home-corner-btn" href="index.html" target="_top" title="⌂ Menu principal">🏠</a>
+        <a class="home-corner-btn" href="index.html?view=home" target="_top" title="⌂ Menu principal" onclick="try{localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.localStorage) window.top.localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.BloxdToolsHub && window.top.BloxdToolsHub.goHome){event.preventDefault(); window.top.BloxdToolsHub.goHome();} else if(window.top){try{window.top.postMessage({type:'bloxdTools:goHome'},'*');}catch(e){}}}catch(e){}">🏠</a>
         <button class="tbtn primary" id="btn-import"><span>📂</span> Import .bloxdschem</button>
         <input id="file-input" type="file" accept=".bloxdschem,.schem,.bin" multiple style="display:none">
         <span class="tbtn-sep"></span>
