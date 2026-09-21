@@ -128,30 +128,19 @@ function saveUserMap() {
 }
 
 // ─── Couleurs de blocs (aperçu 3D) ───
-const COLOR_WORDS = {
-    'white': '#e6e6e6', 'orange': '#e07f28', 'magenta': '#c44fc4', 'light blue': '#7aa3e0',
-    'yellow': '#e8c93c', 'lime': '#7ec84e', 'pink': '#e8a0b0', 'gray': '#8a8a8a', 'grey': '#8a8a8a',
-    'light gray': '#ababab', 'light grey': '#ababab', 'cyan': '#4eb8c8', 'purple': '#884ec8',
-    'blue': '#4a63c8', 'brown': '#8a5a34', 'green': '#5aa04e', 'red': '#c8443c', 'black': '#2e2e2e',
-};
-const KEYWORD_COLORS = [
-    ['grass', '#4ea64e'], ['dirt', '#6b4423'], ['mud', '#5c4a38'], ['stone', '#7d7d7d'], ['granite', '#9c7060'],
-    ['diorite', '#b8b8b8'], ['andesite', '#8a8a86'], ['sand', '#e0d190'], ['gravel', '#8f8a84'], ['clay', '#9fa6b0'],
-    ['snow', '#eef4fa'], ['ice', '#9cc8f0'], ['water', '#3d6edb'], ['lava', '#e06020'], ['leaves', '#3f8f35'],
-    ['log', '#7a4d2a'], ['wood', '#9c7448'], ['plank', '#a8845c'], ['glass', '#bcd8e8'], ['lamp', '#e8d070'],
-    ['gold', '#e8c33c'], ['iron', '#c8c8c8'], ['diamond', '#5ce8de'], ['emerald', '#44c86a'], ['lapis', '#3a58c8'],
-    ['coal', '#333333'], ['brick', '#9c5a4a'], ['bookshelf', '#a8845c'], ['wheat', '#c8b050'], ['flower', '#d86ab0'],
-    ['vine', '#4a8a3a'], ['cactus', '#5a9a4a'], ['mushroom', '#c88a6a'], ['pumpkin', '#d88a2a'], ['bedrock', '#3a3a44'],
-    ['obsidian', '#241f36'], ['nether', '#6a3440'], ['end', '#d8d8a8'], ['quartz', '#e8e0d8'], ['marble', '#dcdcd4'],
-    ['slate', '#4a5058'], ['basalt', '#4a4a52'], ['tuff', '#6a6c64'], ['calcite', '#dcdcd0'], ['copper', '#c87c50'],
-    ['amethyst', '#9a6ac8'], ['glowstone', '#e8c878'], ['sea lantern', '#a8e0d0'], ['fire', '#e05820'],
-];
+// Palette partagée avec le Schem Placer (block_colors.js) ; repli heuristique
+// si le module n'a pas pu être chargé.
+const _hasSharedColors = typeof BloxdBlockColors !== 'undefined';
 function blockColorHex(id) {
+    if (_hasSharedColors) return BloxdBlockColors.hex(id);
+    // repli minimal (ne devrait pas arriver : block_colors.js est local)
     const name = (ID_TO_NAME[id] || '').toLowerCase();
-    if (!name) return '#404048';
-    for (const w in COLOR_WORDS) if (name.includes(w)) return COLOR_WORDS[w];
-    for (const [kw, c] of KEYWORD_COLORS) if (name.includes(kw)) return c;
-    // hash déterministe (comme schem_splitter)
+    if (name.includes('grass') || name.includes('leaves')) return '#4ea64e';
+    if (name.includes('dirt')) return '#6e4b2a';
+    if (name.includes('stone')) return '#7d7d7d';
+    if (name.includes('sand')) return '#e0d190';
+    if (name.includes('glass')) return '#bcd8e8';
+    if (name.includes('water')) return '#3d6edb';
     let h = id; h = ((h >>> 16) ^ h) * 0x45d9f3b; h = ((h >>> 16) ^ h) * 0x45d9f3b; h = (h >>> 16) ^ h;
     const v = 0x60 + (h & 0x3f);
     return '#' + [v, v, v].map(x => x.toString(16).padStart(2, '0')).join('');
@@ -223,7 +212,12 @@ function showPreview(result) {
 const COLOR_CACHE = {};
 function colorFor(id) {
     let c = COLOR_CACHE[id];
-    if (!c) { c = hexToRGB(blockColorHex(id)); COLOR_CACHE[id] = c; }
+    if (!c) {
+        // IMPORTANT : couleurs de sommets Babylon = RGBA (4 composantes, alpha=1)
+        const rgb = _hasSharedColors ? BloxdBlockColors.rgb(id) : hexToRGB(blockColorHex(id));
+        c = [rgb[0], rgb[1], rgb[2], 1];
+        COLOR_CACHE[id] = c;
+    }
     return c;
 }
 
@@ -243,7 +237,7 @@ function processBuildJob() {
                 if (j.isSolid(x + f.d[0], y + f.d[1], z + f.d[2])) continue;
                 if (j.faces >= FACE_CAP) { j.tooBig = true; j.done = true; finalizeMesh(j); return; }
                 const P = j.pos, N = j.nor, C = j.col, I = j.idx, b = j.base;
-                for (const corner of f.c) { P.push(x + corner[0], y + corner[1], z + corner[2]); N.push(f.n[0], f.n[1], f.n[2]); C.push(col[0], col[1], col[2]); }
+                for (const corner of f.c) { P.push(x + corner[0], y + corner[1], z + corner[2]); N.push(f.n[0], f.n[1], f.n[2]); C.push(col[0], col[1], col[2], col[3]); }
                 I.push(b, b + 1, b + 2, b, b + 2, b + 3);
                 j.base += 4; j.faces += 2;
             }
@@ -263,6 +257,7 @@ function finalizeMesh(j) {
     const mat = new BABYLON.StandardMaterial('m', scene);
     mat.specularColor = new BABYLON.Color3(0.04, 0.04, 0.04);
     mat.backFaceCulling = false;
+    mat.useVertexColors = true;      // comme le Schem Splitter
     mesh.material = mat;
     previewMesh = mesh;
     if (j.tooBig) consoleWarn(t('preview_too_big'));
@@ -513,6 +508,8 @@ async function boot() {
         const map = await mapRes.json();
         NAME_TO_ID = await ntiRes.json();
         for (const k in NAME_TO_ID) if (ID_TO_NAME[NAME_TO_ID[k]] === undefined) ID_TO_NAME[NAME_TO_ID[k]] = k;
+        // palette de couleurs partagée avec le Schem Placer (aperçu 3D identique)
+        if (typeof BloxdBlockColors !== 'undefined') BloxdBlockColors.init(NAME_TO_ID);
         BloxdSchemConverter.init({ map, nameToId: NAME_TO_ID, userMap: USER_MAP });
         mapsReady = true;
     } catch (e) {
