@@ -20,7 +20,7 @@ const I18N = {
         terrain_desc: "Sculptez et peignez le terrain de votre monde en 3D : élévation, pinceaux, biomes et import/export.",
         asset_tag: "Décoration",
         asset_desc: "Placez des objets, constructions et assets personnalisés sur votre terrain avec une bibliothèque organisée.",
-        footer: "Bloxd Tools v6.10.0 — Langue et clavier partagés entre tous les éditeurs via le menu",
+        footer: "Bloxd Tools v6.11.0 — Langue et clavier partagés entre tous les éditeurs via le menu",
         lang_label: "Langue / Language",
         lang_note: "Appliqué à tous les éditeurs. Garde le choix d'une visite à l'autre.",
         kb_label: "Disposition clavier",
@@ -51,6 +51,18 @@ const I18N = {
             "🖱️ <b>Clic gauche + glisser</b>: orbiter · <b>Clic droit</b>: déplacer (pan)",
             "🖥️ <b>Molette</b>: zoom",
             "🎮 <b>ZQSD/WASD</b>: voler · <b>Espace/Ctrl</b>: monter/descendre · <b>Maj</b>: ×10",
+        ],
+        converter_tag: "Conversion",
+        converter_desc: "Convertissez vos schematics Minecraft (.schem, .schematic, .litematic) en .bloxdschem pour Bloxd.io.",
+        help_converter: [
+            "📂 <b>Import</b>: déposez un .schem (Sponge), .schematic (MCEdit) ou .litematic (Litematica)",
+            "🔄 <b>Conversion</b>: automatique à l'import — l'axe Z est adapté à Bloxd",
+            "🧱 <b>Blocs sans équivalent</b>: remplacés par de la Dirt — ajustables via Mappings (choix mémorisé)",
+            "📦 <b>Découpe auto</b>: si le schem dépasse 160 chunks (limite Bloxd), il est découpé en ZIP",
+            "📄 <b>Parties _x…_z…</b>: refusionnées automatiquement par Schem Placer à l'import",
+            "🖱️ <b>Clic gauche + glisser</b>: orbiter · <b>Clic droit</b>: déplacer (pan)",
+            "🖥️ <b>Molette</b>: zoom",
+            "🎮 <b>ZQSD/WASD</b>: voler · <b>Espace/Ctrl</b>: monter/descendre · <b>Maj</b>: ×2",
         ],
         help_terrain: [
             "🖱️ <b>Clic gauche + glisser</b> : orbiter la caméra 3D",
@@ -90,7 +102,7 @@ const I18N = {
         terrain_desc: "Sculpt and paint your world's terrain in 3D: elevation, brushes, biomes and import/export.",
         asset_tag: "Props",
         asset_desc: "Place objects, builds and custom assets on your terrain with an organized library.",
-        footer: "Bloxd Tools v6.10.0 — Language and keyboard shared across all editors via the",
+        footer: "Bloxd Tools v6.11.0 — Language and keyboard shared across all editors via the",
         lang_note: "Applied to all editors. Remembered between visits.",
         kb_label: "Keyboard layout",
         kb_note: "Controls camera movement keys (ZQSD/WASD) in all editors.",
@@ -144,6 +156,18 @@ const I18N = {
             "🖥️ <b>Wheel</b>: zoom",
             "🎮 <b>WASD/ZQSD</b>: fly · <b>Space/Ctrl</b>: up/down · <b>Shift</b>: ×10",
         ],
+        converter_tag: "Conversion",
+        converter_desc: "Convert Minecraft schematics (.schem, .schematic, .litematic) into .bloxdschem files for Bloxd.io.",
+        help_converter: [
+            "📂 <b>Import</b>: drop a .schem (Sponge), .schematic (MCEdit) or .litematic (Litematica)",
+            "🔄 <b>Conversion</b>: automatic on import — the Z axis is adapted to Bloxd",
+            "🧱 <b>Blocks with no equivalent</b>: replaced with Dirt — adjustable via Mappings (choice remembered)",
+            "📦 <b>Auto-split</b>: schems over 160 chunks (Bloxd limit) are split into a ZIP",
+            "📄 <b>_x…_z… parts</b>: automatically re-merged by Schem Placer on import",
+            "🖱️ <b>Left-click + drag</b>: orbit · <b>Right-click</b>: pan",
+            "🖥️ <b>Wheel</b>: zoom",
+            "🎮 <b>WASD/ZQSD</b>: fly · <b>Space/Ctrl</b>: up/down · <b>Shift</b>: ×2",
+        ],
     },
     ja: {
         brand_sub: "エディタスイート", settings: "設定", tab_home: "ホーム",
@@ -153,7 +177,7 @@ const I18N = {
         open: "開く", soon: "近日",
         terrain_tag: "地形", terrain_desc: "3Dで地形を彫刻・ペイント：標高、ブラシ、バイオーム、インポート/エクスポート。",
         asset_tag: "配置", asset_desc: "整理されたライブラリでオブジェクトや建物を地形に配置。",
-        footer: "Bloxd Tools v6.10.0 — すべてのエディタで言語・キーボード共有",
+        footer: "Bloxd Tools v6.11.0 — すべてのエディタで言語・キーボード共有",
         lang_label: "言語", lang_note: "すべてのエディタに適用。記憶されます。",
         kb_label: "キーボード配列", kb_note: "移動キー（ZQSD/WASD）を制御。",
         close: "閉じる",
@@ -162,6 +186,9 @@ const I18N = {
         help_terrain: ["🖱️ <b>左クリック+ドラッグ</b>: 3Dカメラ回転","🖱️ <b>右クリック+ドラッグ</b>: パン","🖥️ <b>ホイール</b>: ズーム","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: 3D飛行 · <b>Shift</b>: ×3","🎥 <b>カメラ</b>ボタン: 3Dリセット","🗺️ <b>2D地図</b>: 左クリック=ペイント · ドラッグ=パン","🎨 <b>ツール</b>: バイオーム, 上昇, 下降, スムーズ, 平坦化, 消去","⭕ <b>球</b> / 📦 <b>箱</b>: 地形スタンプ","↶ <b>Ctrl+Z</b>: 元に戻す · ↷ <b>Ctrl+Y</b>: やり直し","🏔️ <b>設定</b>: 寸法, シード, バイオーム, プリセット","💾 <b>エクスポート</b>: .bloxdschem生成"],
         help_asset: ["🖱️ <b>左クリック</b>: アセット選択","🖱️ <b>ドラッグ</b>: 地形上で移動","🖥️ <b>ホイール</b>: ズーム","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: 飛行","🗑️ <b>削除</b>: アセット除去 · 📋 <b>複製</b>: クローン","📂 <b>インポート</b>: .bloxdschemを地形として読込","📤 <b>エクスポート</b>: 配置済みアセット付きスケマ生成","🏠 <b>メニュー</b>: ハブへ戻る · 🔒 <b>ロック</b>: 選択ブロック"],
         help_splitter: ["📂 <b>インポート</b>: 複数アセットを含む.bloxdschemを読込","✂️ <b>検出&分割</b>: 各ユニットを検出","🏢 <b>プラットフォーム自動削除</b>: 全面層(>85%)を除去","📦 <b>ZIP保存</b>: 各ユニット=1ファイル","🖱️ <b>左クリック+ドラッグ</b>: 回転 · <b>右クリック</b>: パン","🖥️ <b>ホイール</b>: ズーム","🎮 <b>WASD/ZQSD</b>: 飛行 · <b>Space/Ctrl</b>: 上昇/下降 · <b>Shift</b>: ×10"],
+        converter_tag: "変換",
+        converter_desc: "Minecraftのスケマティック（.schem / .schematic / .litematic）をBloxd.io用の.bloxdschemに変換。",
+        help_converter: ["📂 <b>インポート</b>: .schem（Sponge）/ .schematic（MCEdit）/ .litematic（Litematica）をドロップ","🔄 <b>変換</b>: 読み込み時に自動 — Z軸はBloxd向けに調整","🧱 <b>対応なしブロック</b>: Dirtに置換 — 「ブロック対応」で調整可（保存される）","📦 <b>自動分割</b>: 160チャンク超（Bloxd制限）はZIPに分割","📄 <b>_x…_z… パーツ</b>: Schem Placerがインポート時に自動再結合","🖱️ <b>左クリック+ドラッグ</b>: 回転 · <b>右クリック</b>: パン","🖥️ <b>ホイール</b>: ズーム","🎮 <b>WASD/ZQSD</b>: 飛行 · <b>Space/Ctrl</b>: 上昇/下降 · <b>Shift</b>: ×2"],
     },
     ko: {
         brand_sub: "에디터 모음", settings: "설정", tab_home: "홈",
@@ -171,7 +198,7 @@ const I18N = {
         open: "열기", soon: "준비 중",
         terrain_tag: "지형", terrain_desc: "3D로 지형 조각 및 페인트: 고도, 브러시, 바이옴, 가져오기/내보내기.",
         asset_tag: "소품", asset_desc: "정리된 라이브러리로 지형에 오브젝트와 건물 배치.",
-        footer: "Bloxd Tools v6.10.0 — 모든 에디터에서 언어·키보드 공유",
+        footer: "Bloxd Tools v6.11.0 — 모든 에디터에서 언어·키보드 공유",
         lang_label: "언어", lang_note: "모든 에디터에 적용됩니다.",
         kb_label: "키보드 배치", kb_note: "이동 키(ZQSD/WASD)를 제어합니다.",
         close: "닫기",
@@ -180,6 +207,9 @@ const I18N = {
         help_terrain: ["🖱️ <b>좌클릭+드래그</b>: 3D 카메라 회전","🖱️ <b>우클릭+드래그</b>: 팬","🖥️ <b>휠</b>: 줌","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: 3D 비행 · <b>Shift</b>: ×3","🎥 <b>카메라</b> 버튼: 3D 리셋","🗺️ <b>2D 지도</b>: 좌클릭=페인트 · 드래그=팬","🎨 <b>도구</b>: 바이옴, 올리기, 내리기, 평탄화, 지우개","⭕ <b>구</b> / 📦 <b>상자</b>: 지형 스탬프","↶ <b>Ctrl+Z</b>: 실행 취소 · ↷ <b>Ctrl+Y</b>: 다시 실행","🏔️ <b>설정</b>: 크기, 시드, 바이옴, 프리셋","💾 <b>내보내기</b>: .bloxdschem 생성"],
         help_asset: ["🖱️ <b>좌클릭</b>: 에셋 선택","🖱️ <b>드래그</b>: 지형 위 이동","🖥️ <b>휠</b>: 줌","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: 비행","🗑️ <b>삭제</b>: 에셋 제거 · 📋 <b>복제</b>: 클론","📂 <b>가져오기</b>: .bloxdschem 지형 로드","📤 <b>내보내기</b>: 배치된 에셋 포함 스케매틱 생성","🏠 <b>메뉴</b>: 허브로 · 🔒 <b>잠금</b>: 선택 차단"],
         help_splitter: ["📂 <b>가져오기</b>: 여러 에셋이 포함된 .bloxdschem 로드","✂️ <b>감지&분할</b>: 각 유닛 감지","🏢 <b>플랫폼 자동 제거</b>: 전면 층(>85%) 제거","📦 <b>ZIP 저장</b>: 각 유닛=1 파일","🖱️ <b>좌클릭+드래그</b>: 회전 · <b>우클릭</b>: 팬","🖥️ <b>휠</b>: 줌","🎮 <b>WASD/ZQSD</b>: 비행 · <b>Space/Ctrl</b>: 상승/하강 · <b>Shift</b>: ×10"],
+        converter_tag: "변환",
+        converter_desc: "마인크래프트 스케매(.schem / .schematic / .litematic)를 Bloxd.io용 .bloxdschem으로 변환.",
+        help_converter: ["📂 <b>가져오기</b>: .schem(Sponge) / .schematic(MCEdit) / .litematic(Litematica) 드롭","🔄 <b>변환</b>: 가져오기 시 자동 — Z축이 Bloxd에 맞게 조정됨","🧱 <b>대응 없는 블록</b>: Dirt로 대체 — 「블록 매핑」에서 조정(저장됨)","📦 <b>자동 분할</b>: 160청록 초과(Bloxd 제한) 시 ZIP으로 분할","📄 <b>_x…_z… 파트</b>: Schem Placer에서 가져오면 자동 병합","🖱️ <b>좌클릭+드래그</b>: 회전 · <b>우클릭</b>: 팬","🖥️ <b>휠</b>: 줌","🎮 <b>WASD/ZQSD</b>: 비행 · <b>Space/Ctrl</b>: 상승/하강 · <b>Shift</b>: ×2"],
     },
     th: {
         brand_sub: "ชุดเครื่องมือแก้ไข", settings: "ตั้งค่า", tab_home: "หน้าแรก",
@@ -189,7 +219,7 @@ const I18N = {
         open: "เปิด", soon: "เร็วๆ นี้",
         terrain_tag: "ภูมิประเทศ", terrain_desc: "แกะสลักและวาดภูมิประเทศใน 3D: ความสูง แปรง ไบโอม นำเข้า/ส่งออก",
         asset_tag: "อุปกรณ์", asset_desc: "วางวัตถุและอาคารบนภูมิประเทศด้วยไลบรารีที่จัดระเบียบ",
-        footer: "Bloxd Tools v6.10.0 — แชร์ภาษาและคีย์บอร์ดระหว่างเครื่องมือทั้งหมด",
+        footer: "Bloxd Tools v6.11.0 — แชร์ภาษาและคีย์บอร์ดระหว่างเครื่องมือทั้งหมด",
         lang_label: "ภาษา", lang_note: "ใช้กับเครื่องมือทั้งหมด จดจำไว้สำหรับครั้งต่อไป",
         kb_label: "เลย์เอาต์คีย์บอร์ด", kb_note: "ควบคุมปุ่มเคลื่อนที่ (ZQSD/WASD)",
         close: "ปิด",
@@ -198,6 +228,9 @@ const I18N = {
         help_terrain: ["🖱️ <b>คลิกซ้าย+ลาก</b>: หมุนกล้อง 3D","🖱️ <b>คลิกขวา+ลาก</b>: เลื่อนมุมมอง","🖥️ <b>ล้อ</b>: ซูม","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: บิน 3D · <b>Shift</b>: ×3","🎥 ปุ่ม <b>กล้อง</b>: รีเซ็ต 3D","🗺️ <b>แผนที่ 2D</b>: คลิกซ้าย=วาด · ลาก=เลื่อน","🎨 <b>เครื่องมือ</b>: ไบโอม, ยก, ลด, เรียบ, ราบ, ยางลบ","⭕ <b>ทรงกลม</b> / 📦 <b>กล่อง</b>: ปั้นภูมิประเทศ","↶ <b>Ctrl+Z</b>: ยกเลิก · ↷ <b>Ctrl+Y</b>: ทำซ้ำ","🏔️ <b>ตั้งค่า</b>: ขนาด, ซีด, ไบโอม, พรีเซ็ต","💾 <b>ส่งออก</b>: สร้าง .bloxdschem"],
         help_asset: ["🖱️ <b>คลิกซ้าย</b>: เลือกอุปกรณ์","🖱️ <b>ลาก</b>: ย้ายบนภูมิประเทศ","🖥️ <b>ล้อ</b>: ซูม","🎮 <b>WASD/ZQSD + Space/Ctrl</b>: บิน","🗑️ <b>ลบ</b>: ลบอุปกรณ์ · 📋 <b>ทำซ้ำ</b>: โคลน","📂 <b>นำเข้า</b>: โหลด .bloxdschem เป็นภูมิประเทศ","📤 <b>ส่งออก</b>: สร้างสเคมาติก","🏠 <b>เมนู</b>: กลับหน้าหลัก · 🔒 <b>ล็อก</b>: บล็อกการเลือก"],
         help_splitter: ["📂 <b>นำเข้า</b>: โหลด .bloxdschem ที่มีหลายอุปกรณ์","✂️ <b>ตรวจจับ&แยก</b>: ค้นหาแต่ละยูนิต","🏢 <b>ลบแพลตฟอร์ม</b>: ชั้นเต็ม (>85%) ถูกลบ","📦 <b>บันทึก ZIP</b>: แต่ละยูนิต=1 ไฟล์","🖱️ <b>คลิกซ้าย+ลาก</b>: หมุน · <b>คลิกขวา</b>: เลื่อน","🖥️ <b>ล้อ</b>: ซูม","🎮 <b>WASD/ZQSD</b>: บิน · <b>Space/Ctrl</b>: ขึ้น/ลง · <b>Shift</b>: ×10"],
+        converter_tag: "แปลง",
+        converter_desc: "แปลงสเคมาติก Minecraft (.schem / .schematic / .litematic) เป็น .bloxdschem สำหรับ Bloxd.io",
+        help_converter: ["📂 <b>นำเข้า</b>: วางไฟล์ .schem (Sponge) / .schematic (MCEdit) / .litematic (Litematica)","🔄 <b>แปลง</b>: อัตโนมัติเมื่อนำเข้า — แกน Z ปรับให้เข้ากับ Bloxd","🧱 <b>บล็อกไม่มีตัวเทียบ</b>: แทนด้วย Dirt — ปรับได้ที่「การจับคู่บล็อก」(จดจำไว้)","📦 <b>แยกอัตโนมัติ</b>: เกิน 160 ชังก์ (ขีดจำกัด Bloxd) จะแยกเป็น ZIP","📄 <b>ชิ้นส่วน _x…_z…</b>: Schem Placer รวมกลับอัตโนมัติเมื่อนำเข้า","🖱️ <b>คลิกซ้าย+ลาก</b>: หมุน · <b>คลิกขวา</b>: เลื่อน","🖥️ <b>ล้อ</b>: ซูม","🎮 <b>WASD/ZQSD</b>: บิน · <b>Space/Ctrl</b>: ขึ้น/ลง · <b>Shift</b>: ×2"],
     }
 };
 function getLang() {
@@ -261,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const helpModal = document.getElementById('help-modal');
     const helpList = document.getElementById('help-modal-list');
     const helpTitle = document.getElementById('help-modal-title');
-    const editorNames = { schem: 'Schem Placer', terrain: 'Terrain Editor', asset: 'Asset Placer', splitter: 'Schem Splitter' };
+    const editorNames = { schem: 'Schem Placer', terrain: 'Terrain Editor', asset: 'Asset Placer', splitter: 'Schem Splitter', converter: 'Schem Converter' };
     document.querySelectorAll('.card-help').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault(); e.stopPropagation();
