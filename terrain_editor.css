@@ -503,6 +503,42 @@ input[type=range]::-webkit-slider-thumb {
     flex-shrink: 0;
 }
 
+/* v4.4 : bouton « modifier » d'une palette (cartes Paramètres) */
+.biome-edit-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    border-radius: 2px;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 3px 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.biome-edit-btn:hover {
+    color: #fff;
+    border-color: var(--accent-cyan);
+    background-color: rgba(56, 189, 248, 0.15);
+}
+
+/* v4.4 : badge « modifiée » — palette intégrée dont les blocs ont été changés */
+.biome-modified-badge {
+    color: #fbbf24;
+    font-size: 0.7rem;
+    margin-left: 4px;
+}
+
+/* v4.4 : bouton « restaurer la palette d'origine » (formulaire d'édition) */
+#btn-reset-palette {
+    border-color: rgba(251, 191, 36, 0.4) !important;
+    color: #fbbf24;
+}
+#btn-reset-palette:hover {
+    background-color: rgba(251, 191, 36, 0.12);
+}
+
 /* ==========================================
    OUTILS DU PINCEAU (TOOLBAR)
    ========================================== */

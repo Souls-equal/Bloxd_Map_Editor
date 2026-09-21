@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- La version du titre doit suivre le numéro du zip livré (+0.1 à chaque mise à jour) -->
-    <title>Bloxd Terrain Editor — v4.3.0</title>
+    <title>Bloxd Terrain Editor — v4.4.0</title>
     <!-- Architecture multi-fichiers : tous les fichiers terrain_editor.* doivent rester dans le MÊME dossier -->
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAA5FBMVEVHcEwAAACb6W+BVTpmQiwvGQyt8YQmFAqYZ0Z71FSK317R0dGt8YIZbQ9lQixrw0lAIxM4HA7CwsKtra2U4mqX5m6h7HWJ4F6M3mCg6Xau742s8oITXA0ZbBQbahGZ6W6a6G4TXAscWRIXbg8wGQsSXQs4HA961VR/01Ws7oQlEgsgdhMwMTOve1Oc6W8jEghvUDiM4WITXApqwkhSpDVSpDSw84I4HQyueVKZkItjPiZUpDRpQCdnxEWWaEZ0w09wQylqxElSpTSJXkRSpDZOnzBGTB9lQi2BVTuYkYq4uLikpaao1sLHAAAAAXRSTlMAQObYZgAAALZJREFUGNNNz1dTAkEQBODr3t3LgfMEBQNKUAmSRDGDokj4//+Hc+8srx/m4auZqmnDyAIYxQDHRwUCHIc0D/8ENzzxXdcsM1sCx65pkqyQ9V/B15wD8oJVnjY1/HxHD7x2WAsCS8Nm9fly53cuz9tDpWG9/HgLpz2rcdaKNchFKEU06QOl7ES8CmHfdxU8XGl4f356lHJm4cDLHxnZwpZKYZtK/vqtEKUYuwT/bWyFNEmxoB4w9nFzDKT7ft/PAAAAAElFTkSuQmCC">
     <link rel="stylesheet" href="terrain_editor.css">
@@ -167,7 +167,7 @@
 
                     <!-- FORMULAIRE PALETTE PERSONNALISÉE -->
                     <div class="form-section" id="palette-form" style="display: none; background: rgba(56, 189, 248, 0.06); border: 1px solid var(--accent-cyan); border-radius: 2px; padding: 12px;">
-                        <div class="section-title" style="color: var(--accent-cyan);"><i class="fas fa-palette"></i> <span data-i18n="secPaletteForm">Ma Palette Personnalisée</span></div>
+                        <div class="section-title" style="color: var(--accent-cyan);"><i class="fas fa-palette"></i> <span id="palette-form-title" data-i18n="secPaletteForm">Ma Palette Personnalisée</span></div>
                         <div class="form-group">
                             <label class="form-label" data-i18n="labelPaletteName">Nom de la palette</label>
                             <input type="text" class="input-text" id="palette-name" placeholder="Ma palette" maxlength="24">
@@ -184,8 +184,9 @@
                             <input type="text" class="input-text" id="palette-blocks" placeholder="Purple Wool, Purple Concrete, Amethyst">
                             <p style="color: var(--text-muted); font-size: 0.75rem; margin: 4px 0 0;" data-i18n="paletteBlocksHint">Noms exacts des blocs (ex : Grass Block, Red Sand, Magma). Un bloc inconnu devient Grass Block à l'export.</p>
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             <button class="btn btn-export" id="btn-save-palette" style="flex: 1; padding: 8px;" data-i18n="btnSavePalette">💾 Enregistrer</button>
+                            <button class="btn btn-secondary" id="btn-reset-palette" data-i18n="btnResetPalette" data-i18n-title="confirmResetPalette" title="Restaurer les blocs et la couleur d'origine de cette palette (palettes par défaut uniquement)" style="display:none; padding: 8px 14px;">↩️ Restaurer la palette d'origine</button>
                             <button class="btn btn-secondary" id="btn-cancel-palette" style="padding: 8px 14px;" data-i18n="btnCancelPalette">Annuler</button>
                         </div>
                     </div>
