@@ -4,10 +4,11 @@
 'use strict';
 
 const TOOLS = {
-    schem:    'schem_placer.html',
-    terrain:  'terrain_editor.html',
-    asset:    'asset_placer.html',
-    splitter: 'schem_splitter.html',
+    schem:      'schem_placer.html',
+    terrain:    'terrain_editor.html',
+    asset:      'asset_placer.html',
+    splitter:   'schem_splitter.html',
+    converter:  'schem_converter.html',
 };
 
 function getViewFromUrl() {

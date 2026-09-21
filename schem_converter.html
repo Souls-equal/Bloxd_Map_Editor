@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloxd Tools — Schem Converter v1.0.0</title>
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAKlBMVEVHcEwAAAD///+mBwWPj4+6urr/AgDJBALgEhDdCQcAADVAQEAAANMwMDDLTWdNAAAAAXRSTlMAQObYZgAAAEVJREFUCNdjYMAGGAUgtKBkIYRvOK0dLMRomZYBFmKckZYGFhI2BgJDIEMkSElJ1RHECFwNZUSdxsmIvQthMAoCgQDCZgAI7xCncUnAaQAAAABJRU5ErkJggg==">
+    <link rel="stylesheet" href="schem_converter.css">
+</head>
+<body>
+    <div id="topbar">
+        <a class="home-corner-btn" href="index.html?view=home" target="_top" title="⌂ Menu principal" onclick="try{localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.localStorage) window.top.localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.BloxdToolsHub && window.top.BloxdToolsHub.goHome){event.preventDefault(); window.top.BloxdToolsHub.goHome();} else if(window.top){try{window.top.postMessage({type:'bloxdTools:goHome'},'*');}catch(e){}}}catch(e){}">🏠</a>
+        <button class="tbtn primary" id="btn-import"><span>📂</span> <span id="lbl-import">Import Minecraft schem</span></button>
+        <input id="file-input" type="file" accept=".schem,.schematic,.litematic" multiple style="display:none">
+        <span class="tbtn-sep"></span>
+        <button class="tbtn" id="btn-mappings" title="Block mappings"><span>🧱</span> <span id="lbl-mappings">Mappings</span></button>
+        <button class="tbtn success" id="btn-download" disabled><span>💾</span> <span id="lbl-download">Download</span></button>
+    </div>
+    <canvas id="converter-canvas"></canvas>
+    <div id="info-panel"></div>
+    <div id="drop-overlay"><div class="drop-msg" id="drop-msg">📥 Drop .schem / .schematic / .litematic here</div></div>
+
+    <!-- Modale : correspondances de blocs manquantes -->
+    <div id="mapping-modal" class="modal-mask">
+        <div class="modal-box">
+            <h3>🧱 <span id="lbl-map-title">Block mappings</span></h3>
+            <p class="map-note" id="lbl-map-note"></p>
+            <div id="map-list"></div>
+            <div class="modal-buttons">
+                <button class="tbtn" id="btn-map-reset">↺ <span id="lbl-map-reset">Reset</span></button>
+                <button class="tbtn" id="btn-map-close">✕ <span id="lbl-map-close">Close</span></button>
+                <button class="tbtn success" id="btn-map-save">✔ <span id="lbl-map-save">Save &amp; re-convert</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="schem_converter-core.js"></script>
+    <script src="schem_converter.js"></script>
+</body>
+</html>

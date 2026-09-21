@@ -109,6 +109,7 @@ main { flex: 1; display: flex; flex-direction: column; align-items: center; just
 .card-color-schem   { --card-color: #4aa8ff; --icon-bg: rgba(74,168,255,0.12); --card-glow: rgba(74,168,255,0.16); }
 .card-color-asset   { --card-color: #ffb020; --icon-bg: rgba(255,176,32,0.12); --card-glow: rgba(255,176,32,0.16); }
 .card-color-splitter { --card-color: #cc5de8; --icon-bg: rgba(204,93,232,0.12); --card-glow: rgba(204,93,232,0.16); }
+.card-color-converter { --card-color: #f4645c; --icon-bg: rgba(244,100,92,0.12); --card-glow: rgba(244,100,92,0.16); }
 
 /* SETTINGS MODAL */
 .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);

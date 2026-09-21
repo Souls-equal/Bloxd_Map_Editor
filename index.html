@@ -27,6 +27,7 @@
     <button class="tab-btn" data-view="terrain" style="--tab-color:#3dd48a;"><span class="dot"></span> 🏔️ Terrain Editor</button>
     <button class="tab-btn" data-view="asset" style="--tab-color:#ffb020;"><span class="dot"></span> 🏗️ Asset Placer</button>
     <button class="tab-btn" data-view="splitter" style="--tab-color:#cc5de8;"><span class="dot"></span> ✂️ Schem Splitter</button>
+    <button class="tab-btn" data-view="converter" style="--tab-color:#f4645c;"><span class="dot"></span> 🔄 Schem Converter</button>
 </nav>
 
 <main class="shell-main">
@@ -82,6 +83,17 @@
                 <p data-i18n="splitter_desc">Load a big schem, auto-detect each unit, export them separately in a ZIP.</p>
                 <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
             </div>
+
+            <div class="editor-card card-color-converter" data-view="converter">
+                <button class="card-help" data-help="converter" title="Aide / Help">❓</button>
+                <div class="card-icon">🔄</div>
+                <div>
+                    <div class="card-tag" data-i18n="converter_tag">Conversion</div>
+                    <h2>Schem Converter</h2>
+                </div>
+                <p data-i18n="converter_desc">Convertissez vos schematics Minecraft (.schem, .schematic, .litematic) en .bloxdschem pour Bloxd.io.</p>
+                <div class="open-hint"><span data-i18n="open">Ouvrir</span> <span class="arrow">→</span></div>
+            </div>
         </div>
     </div>
 
@@ -105,11 +117,16 @@
         <iframe title="Schem Splitter"></iframe>
     </div>
 
+    <div id="view-converter" class="view iframe-view">
+        <div class="iframe-loading"><div class="spin"></div><span>Schem Converter…</span></div>
+        <iframe title="Schem Converter"></iframe>
+    </div>
+
 </div>
 </main>
 
 <footer>
-    <span data-i18n="footer">Bloxd Tools v6.10.0 — Langue et clavier partagés entre tous les éditeurs via le menu</span>
+    <span data-i18n="footer">Bloxd Tools v6.11.0 — Langue et clavier partagés entre tous les éditeurs via le menu</span>
     <b>⚙️ Paramètres</b>.
     <br><span style="font-size:10.5px;opacity:0.65;">Made with ❤️ by K4miNoK4mi, EPICOO00000, Arena.ai & Claude (Anthropic)</span>
 </footer>
