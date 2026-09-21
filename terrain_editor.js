@@ -219,6 +219,14 @@ window.I18N = {
             errPaletteExists: "Une palette porte déjà ce nom.",
             delPaletteTip: "Supprimer cette palette",
             confirmDelPalette: "Supprimer cette palette ? Les zones peintes reviendront au biome par défaut.",
+            errPaletteBlocks: "Ajoute au moins 1 bloc !",
+            editPaletteTip: "Modifier cette palette (nom, couleur, blocs)",
+            secPaletteEdit: "Modifier la palette",
+            btnResetPalette: "↩️ Restaurer la palette d'origine",
+            confirmResetPalette: "Restaurer les blocs et la couleur d'origine de cette palette ?",
+            paletteSaved: "Palette enregistrée !",
+            paletteReset: "Palette d'origine restaurée",
+            modifiedTag: "modifiée",
             modalPixelated: "🧊 Style pixelisé (gros blocs texturés)",
             modalPixelatedDesc: "Conserve l'effet \"marches géantes\" : le terrain est exporté en gros plateaux cubiques stylés. Décoché = pentes lissées (interpolation).",
             
@@ -378,6 +386,14 @@ window.I18N = {
             errPaletteExists: "A palette with this name already exists.",
             delPaletteTip: "Delete this palette",
             confirmDelPalette: "Delete this palette? Painted areas will revert to the default biome.",
+            errPaletteBlocks: "Add at least 1 block!",
+            editPaletteTip: "Edit this palette (name, color, blocks)",
+            secPaletteEdit: "Edit palette",
+            btnResetPalette: "↩️ Restore original palette",
+            confirmResetPalette: "Restore this palette's original blocks and color?",
+            paletteSaved: "Palette saved!",
+            paletteReset: "Original palette restored",
+            modifiedTag: "modified",
             modalPixelated: "🧊 Pixelated style (big textured blocks)",
             modalPixelatedDesc: "Keeps the \"giant steps\" effect: terrain is exported as big stylish cubic plateaus. Unchecked = smooth slopes (interpolation).",
             
@@ -446,6 +462,10 @@ window.I18N = {
             labelPaletteBlocks:"Bloxdブロック（カンマ区切り）",paletteBlocksHint:"正確なブロック名を入力。",
             btnSavePalette:"💾 保存",btnCancelPalette:"キャンセル",errPaletteName:"パレット名を入力！",errPaletteExists:"同名のパレットが存在します。",
             delPaletteTip:"パレットを削除",confirmDelPalette:"パレットを削除？",
+            errPaletteBlocks:"ブロックを1つ以上追加してください！",editPaletteTip:"このパレットを編集（名前、色、ブロック）",
+            secPaletteEdit:"パレットを編集",btnResetPalette:"↩️ 元のパレットに復元",
+            confirmResetPalette:"このパレットのブロックと色を元に戻しますか？",paletteSaved:"パレットを保存しました！",
+            paletteReset:"元のパレットを復元しました",modifiedTag:"変更済み",
             modalPixelated:"🧊 ピクセルアート風",modalPixelatedDesc:"「巨大階段」効果を維持。",
             presetClassic:"🟢 クラシック平原",presetArchipelago:"🏝️ 熱帯群島",presetAlpine:"🏔️ 氷河アルプス",
             promptPresetName:"プリセット名：",defaultPresetVal:"Bloxdワールド",presetSaved:"プリセット保存成功： ",errSchemGen:".bloxdschem生成エラー。"
@@ -502,6 +522,10 @@ window.I18N = {
             labelPaletteBlocks:"Bloxd 블록 (쉼표로 구분)",paletteBlocksHint:"정확한 블록 이름 입력.",
             btnSavePalette:"💾 저장",btnCancelPalette:"취소",errPaletteName:"팔레트 이름 입력!",errPaletteExists:"같은 이름이 이미 존재합니다.",
             delPaletteTip:"팔레트 삭제",confirmDelPalette:"팔레트 삭제?",
+            errPaletteBlocks:"블록을 1개 이상 추가하세요!",editPaletteTip:"이 팔레트 수정 (이름, 색상, 블록)",
+            secPaletteEdit:"팔레트 수정",btnResetPalette:"↩️ 원래 팔레트로 복원",
+            confirmResetPalette:"이 팔레트의 블록과 색상을 원래대로 되돌릴까요?",paletteSaved:"팔레트가 저장되었습니다!",
+            paletteReset:"원래 팔레트를 복원했습니다",modifiedTag:"수정됨",
             modalPixelated:"🧊 픽셀 아트 스타일",modalPixelatedDesc:"\"거대 계단\" 효과 유지.",
             presetClassic:"🟢 클래식 평원",presetArchipelago:"🏝️ 열대 군도",presetAlpine:"🏔️ 빙하 알프스",
             promptPresetName:"프리셋 이름:",defaultPresetVal:"Bloxd 월드",presetSaved:"프리셋 저장 성공: ",errSchemGen:".bloxdschem 생성 오류."
@@ -558,6 +582,10 @@ window.I18N = {
             labelPaletteBlocks:"บล็อก Bloxd (คั่นด้วยจุลภาค)",paletteBlocksHint:"ใส่ชื่อบล็อกที่ถูกต้อง",
             btnSavePalette:"💾 บันทึก",btnCancelPalette:"ยกเลิก",errPaletteName:"ตั้งชื่อจานสี!",errPaletteExists:"มีชื่อนี้แล้ว",
             delPaletteTip:"ลบจานสีนี้",confirmDelPalette:"ลบจานสี?",
+            errPaletteBlocks:"เพิ่มบล็อกอย่างน้อย 1 บล็อก!",editPaletteTip:"แก้ไขพาเลทนี้ (ชื่อ, สี, บล็อก)",
+            secPaletteEdit:"แก้ไขพาเลท",btnResetPalette:"↩️ กู้คืนพาเลทเดิม",
+            confirmResetPalette:"กู้คืนบล็อกและสีของพาเลทนี้เป็นค่าเดิมหรือไม่?",paletteSaved:"บันทึกพาเลทแล้ว!",
+            paletteReset:"กู้คืนพาเลทเดิมแล้ว",modifiedTag:"แก้ไขแล้ว",
             modalPixelated:"🧊 สไตล์พิกเซล",modalPixelatedDesc:"คงเอฟเฟกต์ \"บันไดยักษ์\"",
             presetClassic:"🟢 ทุ่งราบคลาสสิก",presetArchipelago:"🏝️ หมู่เกาะเขตร้อน",presetAlpine:"🏔️ ยอดเขาน้ำแข็ง",
             promptPresetName:"ชื่อพรีเซ็ต:",defaultPresetVal:"โลก Bloxd ของฉัน",presetSaved:"บันทึกพรีเซ็ตสำเร็จ: ",errSchemGen:"ข้อผิดพลาดในการสร้าง .bloxdschem"
@@ -574,10 +602,14 @@ window.t = function(key) {
 };
 
 window.getBiomeName = function(bKey, defaultObj) {
+    // v4.4 : les palettes personnalisées OU modifiées (nom changé) affichent leur nom
+    // utilisateur, même quand le biome n'est pas passé en paramètre (registry global)
+    const b = defaultObj || (window._biomeRegistry ? window._biomeRegistry[bKey] : null);
+    if (b && (b.custom || b.modified) && b.name) return b.name;
     const mapKey = 'biome' + bKey.charAt(0).toUpperCase() + bKey.slice(1);
     const translated = window.t(mapKey);
     if (translated && translated !== mapKey) return translated;
-    return defaultObj ? defaultObj.name : bKey;
+    return b ? b.name : bKey;
 };
 
 window.getPresetName = function(pKey, defaultObj) {
@@ -638,6 +670,9 @@ window.applyLanguage = function(lang) {
         window.uiManagerInstance.initPresetsAndActions();
         if (typeof window.uiManagerInstance.renderSettingsBiomes === 'function') window.uiManagerInstance.renderSettingsBiomes();
         if (typeof window.uiManagerInstance.renderEditorBiomes === 'function') window.uiManagerInstance.renderEditorBiomes();
+        // v4.4 : le scan data-i18n ci-dessus a réécrit le titre du formulaire de palette
+        // → on réapplique le titre dynamique (mode édition « Modifier la palette : X »)
+        if (typeof window.uiManagerInstance.refreshPaletteFormTitle === 'function') window.uiManagerInstance.refreshPaletteFormTitle();
         if (typeof window.uiManagerInstance.update3dMeshBtn === 'function') window.uiManagerInstance.update3dMeshBtn();
         window.uiManagerInstance.updateStatsBar();
     }
@@ -863,6 +898,11 @@ class TerrainGenerator {
             }
         };
 
+        // v4.4 : snapshot des palettes d'origine (biomes intégrés) — permet de restaurer
+        // les blocs/couleurs/nom si l'utilisateur a modifié une palette par défaut
+        this.builtinBiomes = JSON.parse(JSON.stringify(this.biomes));
+        // Registre global des biomes (consulté par window.getBiomeName pour les palettes modifiées)
+        window._biomeRegistry = this.biomes;
 
         // REGLES DE HAUTEUR PAR BIOME : { active, yMin, yMax, locked }
         // - active : la règle force ce biome entre yMin et yMax à la génération
@@ -1838,13 +1878,51 @@ class TerrainGenerator {
         return true;
     }
 
-    updateCustomBiome(key, name, color, blocks) {
+    /**
+     * v4.4 : Édition d'une palette quelconque (biomes intégrés ET personnalisés) :
+     * nom, couleur et liste des blocs Bloxd. Les biomes intégrés modifiés sont
+     * marqués `modified` et persistés (restaurables via resetBiome).
+     */
+    updateBiome(key, name, color, blocks) {
         const b = this.biomes[key];
         if (!b) return false;
         if (name) b.name = name;
         if (color) b.color = color;
-        if (blocks && blocks.length) b.blocks = blocks;
+        if (blocks && blocks.length) b.blocks = blocks.slice();
+        if (!b.custom) b.modified = true;
         this.saveCustomBiomes();
+        this.invalidateDetailChunks();
+        return true;
+    }
+
+    updateCustomBiome(key, name, color, blocks) {
+        return this.updateBiome(key, name, color, blocks);
+    }
+
+    /**
+     * v4.4 : remplace le catalogue de biomes (chargement preset / import projet)
+     * ET resynchronise le registre global (window._biomeRegistry) utilisé
+     * par window.getBiomeName pour afficher les noms de palettes modifiées.
+     */
+    setBiomesCatalog(biomes) {
+        this.biomes = biomes;
+        window._biomeRegistry = this.biomes;
+    }
+
+    /**
+     * v4.4 : Restaure une palette intégrée (non personnalisée) à ses blocs/couleur/nom d'origine.
+     * Les règles de hauteur du biome sont conservées.
+     */
+    resetBiome(key) {
+        const b = this.biomes[key];
+        const orig = this.builtinBiomes ? this.builtinBiomes[key] : null;
+        if (!b || !orig) return false;
+        b.name = orig.name;
+        b.color = orig.color;
+        b.blocks = orig.blocks.slice();
+        delete b.modified;
+        this.saveCustomBiomes();
+        this.invalidateDetailChunks();
         return true;
     }
 
@@ -1872,7 +1950,17 @@ class TerrainGenerator {
     saveCustomBiomes() {
         try {
             const out = {};
-            for (let k in this.biomes) if (this.biomes[k].custom) out[k] = this.biomes[k];
+            for (let k in this.biomes) {
+                const b = this.biomes[k];
+                if (b.custom) {
+                    // Palette 100% utilisateur : on sauvegarde l'objet complet
+                    out[k] = JSON.parse(JSON.stringify(b));
+                } else if (b.modified) {
+                    // v4.4 : palette intégrée modifiée (nom/couleur/blocs) — on n'enregistre
+                    // que les champs modifiés, le reste reste géré par le code
+                    out[k] = { name: b.name, color: b.color, blocks: b.blocks.slice() };
+                }
+            }
             window.safeStorage.setItem('bloxd_custom_biomes', JSON.stringify(out));
         } catch (e) {}
     }
@@ -1881,7 +1969,22 @@ class TerrainGenerator {
         try {
             const saved = JSON.parse(window.safeStorage.getItem('bloxd_custom_biomes') || '{}');
             for (let k in saved) {
-                if (!this.biomes[k]) { saved[k].custom = true; this.biomes[k] = saved[k]; }
+                const s = saved[k];
+                if (!this.biomes[k]) {
+                    // Palette utilisateur (créée avant une mise à jour) : adoption complète
+                    s.custom = true; this.biomes[k] = s;
+                } else if (!s.custom) {
+                    // v4.4 : palette INTÉGRÉE modifiée par l'utilisateur → on réapplique les
+                    // champs sauvegardés (les règles de hauteur sont rattachées juste après).
+                    // (Les entrées custom déjà en mémoire sont ignorées : le stockage n'en
+                    // est qu'un miroir, et reloadCustomBiomes est appelé à chaque re-render
+                    // des cartes — il ne faut surtout pas y marquer `modified`.)
+                    const b = this.biomes[k];
+                    if (s.name) b.name = s.name;
+                    if (s.color) b.color = s.color;
+                    if (s.blocks && s.blocks.length) b.blocks = s.blocks;
+                    b.modified = true;
+                }
             }
         } catch (e) {}
     }
@@ -2047,7 +2150,8 @@ class TerrainGenerator {
         if (!p) return;
         Object.assign(this.config, p.config);
         if (p.biomes) {
-            this.biomes = JSON.parse(JSON.stringify(p.biomes));
+            // v4.4 : setBiomesCatalog() maintient window._biomeRegistry à jour
+            this.setBiomesCatalog(JSON.parse(JSON.stringify(p.biomes)));
         }
         if (!this.customEdits) this.customEdits = new Map();
         this.customEdits.clear();
@@ -2089,7 +2193,10 @@ class TerrainGenerator {
             throw new Error('Fichier de projet invalide (type inattendu).');
         }
         Object.assign(this.config, data.config);
-        if (data.biomes) this.biomes = JSON.parse(JSON.stringify(data.biomes));
+        if (data.biomes) {
+            // v4.4 : setBiomesCatalog() maintient window._biomeRegistry à jour
+            this.setBiomesCatalog(JSON.parse(JSON.stringify(data.biomes)));
+        }
         this.initBiomeRules();
         if (!this.customEdits) this.customEdits = new Map();
         this.customEdits.clear();
@@ -5665,6 +5772,8 @@ class UIManager {
 
         if (btnSettings) btnSettings.addEventListener('click', () => switchTab('settings'));
         if (btnEditor) btnEditor.addEventListener('click', () => switchTab('editor'));
+        // v4.4 : exposé pour openPaletteForm (passage automatique à l'onglet Éditeur)
+        this._switchTab = switchTab;
     }
 
     /**
@@ -5970,12 +6079,17 @@ class UIManager {
             const b = this.generator.biomes[key];
             const bName = window.getBiomeName ? window.getBiomeName(key, b) : b.name;
             const rule = b.rule || { active: false, yMin: 0, yMax: 400, locked: false };
+            // v4.4 : badge si la palette intégrée a été modifiée par l'utilisateur
+            const modBadge = (!b.custom && b.modified)
+                ? ` <span class="biome-modified-badge" title="${window.t ? window.t('modifiedTag') : 'modifiée'}">✎</span>`
+                : '';
             const card = document.createElement('div');
             card.className = `biome-card ${this.generator.config.defaultBiome === key ? 'active' : ''}`;
             card.innerHTML = `
                 <div class="biome-card-header">
                     <span class="biome-color-dot" style="background-color: ${b.color}"></span>
-                    <span class="biome-name">${bName}</span>
+                    <span class="biome-name">${bName}${modBadge}</span>
+                    <button type="button" class="biome-edit-btn" title="${window.t ? window.t('editPaletteTip') : 'Modifier cette palette (nom, couleur, blocs)'}">✎</button>
                 </div>
                 <div class="biome-blocks">
                     ${b.blocks.map(bl => `<span class="block-tag">${bl}</span>`).join('')}
@@ -6007,6 +6121,13 @@ class UIManager {
                 card.classList.add('active');
                 this.generator.config.defaultBiome = key;
                 this.triggerRegeneration();
+            });
+
+            // v4.4 : bouton ✎ = ouvrir le formulaire d'édition de la palette (intégrée ou perso)
+            const editBtn = card.querySelector('.biome-edit-btn');
+            if (editBtn) editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openPaletteForm(key);
             });
 
             // ---- Contrôles de la règle ----
@@ -6063,23 +6184,40 @@ class UIManager {
                 btn.classList.add('active');
                 this.map2d.activeBiome = key;
             });
+            // v4.4 : crayon d'édition de la palette (toutes les palettes, intégrées incluses)
+            btn.style.position = 'relative';
+            const edit = document.createElement('span');
+            edit.textContent = '✎';
+            edit.title = window.t ? window.t('editPaletteTip') : 'Modifier cette palette (nom, couleur, blocs)';
+            edit.style.cssText = 'position:absolute;top:2px;right:5px;color:#9aa7c7;font-size:0.7rem;cursor:pointer;font-weight:700;';
+            edit.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openPaletteForm(key);
+            });
+            btn.appendChild(edit);
             // Palette personnalisée : croix de suppression
             if (b.custom) {
                 const del = document.createElement('span');
                 del.textContent = '✕';
                 del.title = window.t ? window.t('delPaletteTip') : 'Supprimer cette palette';
-                del.style.cssText = 'position:absolute;top:2px;right:5px;color:#ef4444;font-size:0.7rem;cursor:pointer;font-weight:700;';
+                del.style.cssText = 'position:absolute;top:2px;right:18px;color:#ef4444;font-size:0.7rem;cursor:pointer;font-weight:700;';
                 del.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (!confirm(window.t ? window.t('confirmDelPalette') : 'Supprimer cette palette ? Les zones peintes reviendront au biome par défaut.')) return;
                     if (this.generator.saveStateForUndo) this.generator.saveStateForUndo();
                     this.generator.removeCustomBiome(key);
                     if (this.map2d.activeBiome === key) this.map2d.activeBiome = this.generator.config.defaultBiome || 'plain';
+                    // v4.4 : si le formulaire d'édition était ouvert sur cette palette, on le referme
+                    if (this._paletteEditKey === key) {
+                        this._paletteEditKey = null;
+                        this.refreshPaletteFormTitle();
+                        const pf = document.getElementById('palette-form');
+                        if (pf) pf.style.display = 'none';
+                    }
                     this.renderEditorBiomes();
                     this.renderSettingsBiomes();
                     this.triggerRegeneration();
                 });
-                btn.style.position = 'relative';
                 btn.appendChild(del);
             }
             container.appendChild(btn);
@@ -6087,7 +6225,9 @@ class UIManager {
     }
 
     /**
-     * PALETTES PERSONNALISÉES : formulaire d'ajout (nom, couleur, blocs)
+     * PALETTES : formulaire d'ajout / d'édition (nom, couleur, blocs)
+     * v4.4 : sert aussi à éditer les palettes EXISTANTES — intégrées (Plaines, Forêt,
+     * Sable…) ou personnalisées — et à restaurer les palettes d'origine.
      */
     initPaletteForm() {
         const btnAdd = document.getElementById('btn-add-palette');
@@ -6098,10 +6238,26 @@ class UIManager {
         const inpBlocks = document.getElementById('palette-blocks');
         const btnSave = document.getElementById('btn-save-palette');
         const btnCancel = document.getElementById('btn-cancel-palette');
+        const btnReset = document.getElementById('btn-reset-palette');
         if (!btnAdd || !form) return;
 
+        this._paletteEditKey = null;
+
+        // "🎨 Ajouter ma palette de couleurs" : bascule le formulaire en mode CRÉATION
         btnAdd.addEventListener('click', () => {
-            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'none') {
+                this._paletteEditKey = null;
+                this.refreshPaletteFormTitle();
+                if (btnReset) btnReset.style.display = 'none';
+                if (inpName) inpName.value = '';
+                if (inpColor) inpColor.value = '#cc5de8';
+                if (inpHex) inpHex.value = '#cc5de8';
+                if (inpBlocks) inpBlocks.value = '';
+                form.style.display = 'block';
+                form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } else {
+                form.style.display = 'none';
+            }
         });
         if (btnCancel) btnCancel.addEventListener('click', () => { form.style.display = 'none'; });
         // Synchronisation pipette <-> champ hexa
@@ -6114,13 +6270,58 @@ class UIManager {
                 inpHex.value = inpColor.value;
             });
         }
+
+        // v4.4 : restaurer les blocs/couleur d'origine d'une palette intégrée
+        if (btnReset) btnReset.addEventListener('click', () => {
+            if (!this._paletteEditKey) return;
+            const b = this.generator.biomes[this._paletteEditKey];
+            if (!b || b.custom) return;
+            if (!confirm(window.t ? window.t('confirmResetPalette') : "Restaurer les blocs et la couleur d'origine de cette palette ?")) return;
+            if (this.generator.resetBiome(this._paletteEditKey)) {
+                form.style.display = 'none';
+                this.renderEditorBiomes();
+                this.renderSettingsBiomes();
+                this.triggerRegeneration();
+                window.showToast && window.showToast('♻️ ' + (window.t ? window.t('paletteReset') : "Palette d'origine restaurée"));
+            }
+        });
+
         if (btnSave) btnSave.addEventListener('click', () => {
             const name = (inpName && inpName.value.trim()) || '';
             if (!name) { alert(window.t ? window.t('errPaletteName') : 'Donne un nom à ta palette !'); return; }
             const color = inpColor ? inpColor.value : '#a78bfa';
             const blocks = (inpBlocks && inpBlocks.value.trim())
                 ? inpBlocks.value.split(',').map(s => s.trim()).filter(Boolean)
-                : ['Grass Block'];
+                : null;
+            if (!blocks || !blocks.length) { alert(window.t ? window.t('errPaletteBlocks') : 'Ajoute au moins 1 bloc !'); return; }
+
+            // Nom unique (on exclut la palette en cours d'édition)
+            for (let k in this.generator.biomes) {
+                if (k === this._paletteEditKey) continue;
+                const other = this.generator.biomes[k];
+                if (other.name && other.name.toLowerCase() === name.toLowerCase()) {
+                    alert(window.t ? window.t('errPaletteExists') : 'Une palette porte déjà ce nom.');
+                    return;
+                }
+            }
+
+            if (this._paletteEditKey) {
+                // v4.4 : mode ÉDITION — palette intégrée ou personnalisée
+                const key = this._paletteEditKey;
+                if (this.generator.saveStateForUndo) this.generator.saveStateForUndo();
+                if (!this.generator.updateBiome(key, name, color, blocks)) {
+                    alert(window.t ? window.t('errPaletteExists') : 'Palette inconnue.');
+                    return;
+                }
+                form.style.display = 'none';
+                this.renderEditorBiomes();
+                this.renderSettingsBiomes();
+                this.triggerRegeneration();
+                window.showToast && window.showToast('✅ ' + (window.t ? window.t('paletteSaved') : 'Palette enregistrée !'));
+                return;
+            }
+
+            // Mode CRÉATION (comportement d'origine)
             const key = 'custom_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
             if (this.generator.biomes[key]) { alert(window.t ? window.t('errPaletteExists') : 'Une palette porte déjà ce nom.'); return; }
             if (this.generator.saveStateForUndo) this.generator.saveStateForUndo();
@@ -6134,6 +6335,52 @@ class UIManager {
             this.renderEditorBiomes();
             window.showToast && window.showToast('🎨 ' + name + (window.t && window.I18N && window.I18N.lang === 'en' ? ' palette added!' : ' ajoutée à tes palettes !'));
         });
+    }
+
+    /**
+     * v4.4 : ouvre le formulaire de palette en mode ÉDITION pour la palette donnée.
+     * Fonctionne pour les biomes intégrés (plain, forest, sand…) ET les biomes personnalisés.
+     */
+    openPaletteForm(biomeKey) {
+        const b = this.generator.biomes[biomeKey];
+        const form = document.getElementById('palette-form');
+        const inpName = document.getElementById('palette-name');
+        const inpColor = document.getElementById('palette-color');
+        const inpHex = document.getElementById('palette-color-hex');
+        const inpBlocks = document.getElementById('palette-blocks');
+        const btnReset = document.getElementById('btn-reset-palette');
+        if (!b || !form) return;
+
+        this._paletteEditKey = biomeKey;
+        if (inpName) inpName.value = b.name || '';
+        if (inpColor) inpColor.value = b.color || '#888888';
+        if (inpHex) inpHex.value = b.color || '#888888';
+        if (inpBlocks) inpBlocks.value = (b.blocks || []).join(', ');
+        this.refreshPaletteFormTitle();
+        // Le bouton « restaurer » n'existe que pour les palettes intégrées
+        if (btnReset) btnReset.style.display = b.custom ? 'none' : 'inline-block';
+
+        // Le formulaire vit dans l'onglet Éditeur : on y bascule si nécessaire
+        if (typeof this._switchTab === 'function' && this.map2d && this.map2d.activeTab !== 'editor') {
+            this._switchTab('editor');
+        }
+        form.style.display = 'block';
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /**
+     * v4.4 : titre du formulaire de palette (« Ma palette personnalisée »
+     * ou « Modifier la palette : <nom> »)
+     */
+    refreshPaletteFormTitle() {
+        const titleEl = document.getElementById('palette-form-title');
+        if (!titleEl) return;
+        if (this._paletteEditKey && this.generator.biomes[this._paletteEditKey]) {
+            const b = this.generator.biomes[this._paletteEditKey];
+            titleEl.textContent = (window.t ? window.t('secPaletteEdit') : 'Modifier la palette') + ' : ' + b.name;
+        } else {
+            titleEl.textContent = window.t ? window.t('secPaletteForm') : 'Ma palette personnalisée';
+        }
     }
 
     /**
