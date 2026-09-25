@@ -947,12 +947,19 @@ const i18nMap = {
         copy_done: 'Partie copiée.',
         open:'Ouvrir', export:'Exporter', mode_select:'Souris', mode_move:'Déplacer', mode_scale:'Séparer', mode_multi:'Multi', clear:'Vider',
         dim:'Dimensions', pos:'Position', blocks:'Blocs', color:'Couleur', step:'Pas :', blocks_unit:'bloc(s)', shift_hint:'Maintenir Maj pour ×10', rename:'Renommer',
-        schems:'Schems', no_schem:'Aucun schem. Glissez-déposez ou', open_hint:'cliquez sur Ouvrir',
+        schems:'Schems', no_schem:'Aucun schem. Glisse un .bloxdschem / .zip, ou', open_hint:'cliquez sur Ouvrir',
         cut_title:'✂️ Séparer', cut_extract:'✂️ Couper', cut_copy:'📑 Dupliquer',
         multi_title:'🔲 Multi-sélection —', schems_word:'schem(s)', multi_union:'🔗 Unir', multi_split:'✂️ Désunir', multi_export:'💾 Exporter',
-        drop_msg:'📥 Déposez vos .bloxdschem ou un .zip ici',
+        drop_msg:'📥 Dépose un .bloxdschem, un .bin ou un .zip de parties',
+        format_note:'Glisse un .bloxdschem, un .bin ou un .zip de parties (_x…_z… sont recollées). Un .schem Minecraft ? D\'abord Schem Converter.',
+        export_format_note:'Sortie : un .bloxdschem, ou un .zip si plus de 160 chunks (limite Bloxd). « Un seul fichier » seulement pour un autre outil, pas pour le jeu.',
+        ext_size:'Taille : {0} blocs', ext_chunks:'Chunks : {0}',
+        hint_single_ok:'Un seul fichier ({0} chunks) : OK pour Bloxd.',
+        hint_single_warn:'Un seul fichier ({0} chunks) : Bloxd va probablement le refuser. Décoche « un seul fichier ».',
+        hint_one:'Détection : 1 fichier .bloxdschem ({0} chunks).',
+        hint_parts:'Détection : {0} parties dans un .zip. Charge-les en jeu une par une, au même Y.',
         export_title:'💾 Exporter', export_base:'Nom de base', export_folder:'Dossier dans le zip', export_coords:'Ajouter les coordonnées _x…_z… dans les noms', export_single:'Forcer un seul fichier', cancel:'Annuler', download:'📦 Télécharger',
-        me_title:'💾 Exporter la sélection', me_single:'📄 Un seul schem', me_single_sub:'Tous les schems fusionnes en UN seul .bloxdschem (jamais decoupe)', me_separate:'📑 Plusieurs schems (separe)', me_separate_sub:'Chaque schem telecharge separement dans un .zip', me_autosplit:'✂️ Fusion + decoupe auto', me_autosplit_sub:'Fusionne tout, puis decoupe en ZIP si > 160 chunks (limite Bloxd)',
+        me_title:'💾 Exporter la sélection', me_single:'📄 Un seul schem', me_single_sub:'Tout fusionné en UN .bloxdschem, jamais découpé. Bloxd peut le refuser s\'il est trop grand.', me_separate:'📑 Plusieurs schems (séparés)', me_separate_sub:'Chaque schem reste séparé, dans un .zip de .bloxdschem.', me_autosplit:'✂️ Fusion + découpe auto', me_autosplit_sub:'Fusionne tout, puis un .zip de parties si > 160 chunks (limite Bloxd). À charger en jeu au même Y.',
         cam_label:'Cam:', step_label:'Pas:',
         help_title:'Guide rapide', help_start:'Commencer',
         prompt_export_name:"Nom de l'export :", prompt_new_name:'Nouveau nom :',
@@ -999,12 +1006,19 @@ const i18nMap = {
         copy_done: 'Part copied.',
         open:'Open', export:'Export', mode_select:'Mouse', mode_move:'Move', mode_scale:'Separate', mode_multi:'Multi', clear:'Clear',
         dim:'Dimensions', pos:'Position', blocks:'Blocks', color:'Color', step:'Step:', blocks_unit:'block(s)', shift_hint:'Hold Shift for ×10', rename:'Rename',
-        schems:'Schems', no_schem:'No schems. Drag & drop or', open_hint:'click Open',
+        schems:'Schems', no_schem:'No schems. Drop a .bloxdschem / .zip, or', open_hint:'click Open',
         cut_title:'✂️ Separate', cut_extract:'✂️ Cut', cut_copy:'📑 Duplicate',
         multi_title:'🔲 Multi-select —', schems_word:'schem(s)', multi_union:'🔗 Union', multi_split:'✂️ Split', multi_export:'💾 Export',
-        drop_msg:'📥 Drop your .bloxdschem or a .zip here',
+        drop_msg:'📥 Drop a .bloxdschem, a .bin or a .zip of parts',
+        format_note:'Drop a .bloxdschem, a .bin or a .zip of parts (_x…_z… are re-merged). A Minecraft .schem? Use Schem Converter first.',
+        export_format_note:'Output: one .bloxdschem, or a .zip above 160 chunks (Bloxd limit). “Single file” is only for another tool, not for the game.',
+        ext_size:'Size: {0} blocks', ext_chunks:'Chunks: {0}',
+        hint_single_ok:'Single file ({0} chunks): OK for Bloxd.',
+        hint_single_warn:'Single file ({0} chunks): Bloxd will probably reject it. Uncheck “single file”.',
+        hint_one:'Detected: 1 .bloxdschem file ({0} chunks).',
+        hint_parts:'Detected: {0} parts in a .zip. Load them in game one by one, at the same Y.',
         export_title:'💾 Export', export_base:'Base name', export_folder:'Folder in the zip', export_coords:'Add _x…_z… coordinates to filenames', export_single:'Force a single file', cancel:'Cancel', download:'📦 Download',
-        me_title:'💾 Export selection', me_single:'📄 One schem', me_single_sub:'All schems merged into ONE .bloxdschem (never split)', me_separate:'📑 Multiple schems (separate)', me_separate_sub:'Each schem downloaded separately in a .zip', me_autosplit:'✂️ Merge + auto-split', me_autosplit_sub:'Merges everything, then splits into ZIP if > 160 chunks (Bloxd limit)',
+        me_title:'💾 Export selection', me_single:'📄 One schem', me_single_sub:'Everything merged into ONE .bloxdschem, never split. Bloxd may reject it if it is too big.', me_separate:'📑 Multiple schems (separate)', me_separate_sub:'Each schem stays separate, in a .zip of .bloxdschem files.', me_autosplit:'✂️ Merge + auto-split', me_autosplit_sub:'Merges everything, then a .zip of parts if > 160 chunks (Bloxd limit). Load them in game at the same Y.',
         cam_label:'Cam:', step_label:'Step:',
         help_title:'Quick guide', help_start:'Start',
         prompt_export_name:'Export name:', prompt_new_name:'New name:',
@@ -1029,7 +1043,7 @@ const i18nMap = {
         schems:'Schems',no_schem:'Schemなし. ドラッグまたは',open_hint:'開くをクリック',
         cut_title:'✂️ 分離',cut_extract:'✂️ 切断',cut_copy:'📑 複製',
         multi_title:'🔲 マルチ選択 —',schems_word:'schem',multi_union:'🔗 結合',multi_split:'✂️ 分離',multi_export:'💾 エクスポート',
-        drop_msg:'📥 .bloxdschemまたは.zipをドロップ',
+        drop_msg:'📥 .bloxdschem / .bin / パーツの.zip をドロップ',format_note:'.bloxdschem・.bin・パーツの.zip（_x…_z… は再結合）。Minecraft の .schem は先に Schem Converter。',export_format_note:'出力は .bloxdschem。160チャンク超は .zip（Bloxdの制限）。「単一ファイル」は他ツール向けで、ゲーム用ではない。',ext_size:'サイズ: {0} ブロック',ext_chunks:'チャンク: {0}',hint_single_ok:'1ファイル（{0} チャンク）: BloxdでOK。',hint_single_warn:'1ファイル（{0} チャンク）: Bloxdが拒否する可能性。単一ファイルをオフに。',hint_one:'検出: .bloxdschem 1ファイル（{0} チャンク）。',hint_parts:'検出: {0} パーツの .zip。ゲームでは同じYで1つずつ読み込む。',
         export_title:'💾 エクスポート',export_base:'ベース名',export_folder:'ZIPフォルダ名',export_coords:'座標 _x…_z… を追加',export_single:'単一ファイル',cancel:'キャンセル',download:'📦 ダウンロード',
         me_title:'💾 選択をエクスポート',me_single:'📄 1ファイル',me_single_sub:'全schemを1つの.bloxdschemに結合',me_separate:'📑 個別(schem毎)',me_separate_sub:'各schemを.zipに個別ダウンロード',me_autosplit:'✂️ 結合+自動分割',me_autosplit_sub:'結合後>160 chunks ならZIP分割',
         cam_label:'カメラ:',step_label:'ステップ:',help_title:'クイックガイド',help_start:'開始',
@@ -1043,7 +1057,7 @@ const i18nMap = {
         schems:'스케맨',no_schem:'스케맨 없음. 드래그하거나',open_hint:'열기 클릭',
         cut_title:'✂️ 분할',cut_extract:'✂️ 잘라내기',cut_copy:'📑 복제',
         multi_title:'🔲 다중 선택 —',schems_word:'스케맨',multi_union:'🔗 병합',multi_split:'✂️ 분할',multi_export:'💾 내보내기',
-        drop_msg:'📥 .bloxdschem 또는 .zip 드롭',
+        drop_msg:'📥 .bloxdschem / .bin / 파트 .zip 드롭',format_note:'.bloxdschem, .bin, 파트 .zip(_x…_z… 는 다시 합쳐짐). 마인크래프트 .schem은 먼저 Schem Converter。',export_format_note:'결과는 .bloxdschem. 160청크 초과면 .zip(Bloxd 제한). «단일 파일»은 다른 도구용, 게임용이 아님。',ext_size:'크기: {0} 블록',ext_chunks:'청크: {0}',hint_single_ok:'파일 1개({0} 청크): Bloxd에 OK。',hint_single_warn:'파일 1개({0} 청크): Bloxd가 거부할 수 있음. 단일 파일을 끄세요。',hint_one:'감지: .bloxdschem 1개({0} 청크)。',hint_parts:'감지: {0}개 파트의 .zip. 게임에서 같은 Y로 하나씩 불러오세요。',
         export_title:'💾 내보내기',export_base:'기본 이름',export_folder:'ZIP 폴더명',export_coords:'좌표 _x…_z… 추가',export_single:'단일 파일',cancel:'취소',download:'📦 다운로드',
         me_title:'💾 선택 내보내기',me_single:'📄 1개 파일',me_single_sub:'모든 스케맨을 1개로 병합',me_separate:'📑 개별',me_separate_sub:'각 스케맨을 .zip에 개별 다운로드',me_autosplit:'✂️ 병합+자동 분할',me_autosplit_sub:'병합 후 >160 chunks면 ZIP 분할',
         cam_label:'카메라:',step_label:'단계:',help_title:'빠른 가이드',help_start:'시작',
@@ -1057,7 +1071,7 @@ const i18nMap = {
         schems:'สเคมา',no_schem:'ไม่มีสเคมา. ลากหรือ',open_hint:'คลิกเปิด',
         cut_title:'✂️ แยก',cut_extract:'✂️ ตัด',cut_copy:'📑 ทำซ้ำ',
         multi_title:'🔲 เลือกหลายตัว —',schems_word:'อัน',multi_union:'🔗 รวม',multi_split:'✂️ แยก',multi_export:'💾 ส่งออก',
-        drop_msg:'📥 วาง .bloxdschem หรือ .zip ที่นี่',
+        drop_msg:'📥 วาง .bloxdschem / .bin / .zip ของชิ้นส่วน',format_note:'.bloxdschem, .bin หรือ .zip ของชิ้นส่วน (_x…_z… จะถูกรวม) .schem ของ Minecraft ต้องผ่าน Schem Converter ก่อน',export_format_note:'ได้ .bloxdschem หรือ .zip ถ้าเกิน 160 ชังก์ (ขีดจำกัด Bloxd) «ไฟล์เดียว» สำหรับเครื่องมืออื่น ไม่ใช่สำหรับเกม',ext_size:'ขนาด: {0} บล็อก',ext_chunks:'ชังก์: {0}',hint_single_ok:'ไฟล์เดียว ({0} ชังก์): ใช้ใน Bloxd ได้',hint_single_warn:'ไฟล์เดียว ({0} ชังก์): Bloxd น่าจะปฏิเสธ อย่าติ๊กไฟล์เดียว',hint_one:'ตรวจพบ: .bloxdschem 1 ไฟล์ ({0} ชังก์)',hint_parts:'ตรวจพบ: {0} ส่วนใน .zip โหลดในเกมทีละไฟล์ ที่ความสูง Y เดิม',
         export_title:'💾 ส่งออก',export_base:'ชื่อหลัก',export_folder:'ชื่อโฟลเดอร์ ZIP',export_coords:'เพิ่มพิกัด _x…_z…',export_single:'ไฟล์เดียว',cancel:'ยกเลิก',download:'📦 ดาวน์โหลด',
         me_title:'💾 ส่งออกที่เลือก',me_single:'📄 1 ไฟล์',me_single_sub:'รวมทั้งหมดเป็น 1 ไฟล์',me_separate:'📑 แยก',me_separate_sub:'ดาวน์โหลดแยกใน .zip',me_autosplit:'✂️ รวม+แยกอัตโนมัติ',me_autosplit_sub:'รวมแล้วแยก ZIP ถ้า > 160 chunks',
         cam_label:'กล้อง:',step_label:'ขั้น:',help_title:'คู่มือด่วน',help_start:'เริ่ม',
@@ -1073,11 +1087,13 @@ function i18n(key, ...args) {
 
 function setLang(lang) {
     state.lang = i18nMap[lang] ? lang : 'en';
-    localStorage.setItem('bloxdTools.lang', state.lang);
+    try { localStorage.setItem('bloxdTools.lang', state.lang); } catch (e) {}
     const btn = document.getElementById('btn-lang');
     if (btn) btn.textContent = state.lang.toUpperCase();
     applyStaticI18n();
 }
+
+window.SchemPlacerSetLang = setLang;
 
 function applyStaticI18n() {
     const dict = i18nMap[state.lang] || i18nMap.fr;
@@ -2079,8 +2095,9 @@ function computeExtent() {
 function openExportModal() {
     if (!state.instances.length) { alert(i18n('export_fail')); return; }
     const ext = computeExtent();
+    const size = `${ext.gMaxX-ext.gMinX+1}×${ext.gMaxY-ext.gMinY+1}×${ext.gMaxZ-ext.gMinZ+1}`;
     document.getElementById('export-info').innerHTML =
-        `<div>Étendue : <b>${ext.gMaxX-ext.gMinX+1}×${ext.gMaxY-ext.gMinY+1}×${ext.gMaxZ-ext.gMinZ+1}</b> blocs</div><div>Chunks : <b>${ext.nCX*ext.nCY*ext.nCZ}</b></div><div id="export-hint2" style="margin-top:6px;"></div>`;
+        `<div>${i18n('ext_size', size)}</div><div>${i18n('ext_chunks', ext.nCX*ext.nCY*ext.nCZ)}</div>`;
     document.getElementById('export-modal').classList.add('active'); updateExportHint();
 }
 
@@ -2091,9 +2108,9 @@ function updateExportHint() {
     const total=ext.nCX*ext.nCY*ext.nCZ, LIM=160;
     const forced=document.getElementById('export-single').checked;
     let txt;
-    if(forced) txt = total>LIM ? `⚠️ Un seul fichier (${total} chunks) : risque de rejet par Bloxd.` : `Un seul fichier (${total} chunks) : OK.`;
+    if(forced) txt = total>LIM ? i18n('hint_single_warn', total) : i18n('hint_single_ok', total);
     else { const mt=Math.max(1,Math.floor(Math.sqrt(LIM/Math.max(1,ext.nCY)))); const np=Math.ceil(ext.nCX/mt)*Math.ceil(ext.nCZ/mt);
-        txt = np===1 ? `Détection : 1 seul fichier (${total} chunks).` : `Détection : ${np} parties dans un zip.`; }
+        txt = np===1 ? i18n('hint_one', total) : i18n('hint_parts', np); }
     document.getElementById('export-mode-hint').textContent = txt;
 }
 

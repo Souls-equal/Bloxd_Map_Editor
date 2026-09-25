@@ -31,6 +31,12 @@ const T = {
         preview_too_big: 'Preview hidden (too many faces)',
         attribution: 'Conversion logic & block mappings from M2B (RealSlothuLT3) and hansdiewurst/converter',
         guide: 'Schem parts exported by Schem Converter. Import them all at once in Schem Placer: they are re-merged automatically using the _x…_z… offsets in the file names.',
+        sg_title: 'Minecraft → Bloxd',
+        sg_1: 'Drop a .schem (Sponge), a .schematic (MCEdit) or a .litematic (Litematica).',
+        sg_2: 'Blocks with no Bloxd equivalent become Dirt — change them in Mappings.',
+        sg_3: 'Download a .bloxdschem. Above 160 chunks you get a .zip: Schem Placer re-merges the parts.',
+        sg_note: 'This is not a terrain editor. To sculpt, open Terrain Editor next and import the .bloxdschem.',
+        sg_btn: 'Choose a Minecraft file',
     },
     fr: {
         import: 'Importer schem Minecraft', mappings: 'Correspondances', download: 'Télécharger',
@@ -48,6 +54,12 @@ const T = {
         preview_too_big: 'Aperçu masqué (trop de faces)',
         attribution: 'Logique de conversion et tables de blocs issues de M2B (RealSlothuLT3) et hansdiewurst/converter',
         guide: 'Parties de schem exportées par Schem Converter. Importez-les toutes en même temps dans Schem Placer : elles sont refusionnées automatiquement grâce aux offsets _x…_z… des noms de fichiers.',
+        sg_title: 'Minecraft → Bloxd',
+        sg_1: 'Dépose un .schem (Sponge), un .schematic (MCEdit) ou un .litematic (Litematica).',
+        sg_2: 'Les blocs sans équivalent deviennent de la Dirt — tu peux les changer dans Correspondances.',
+        sg_3: 'Télécharge un .bloxdschem. Au-delà de 160 chunks, tu reçois un .zip : Schem Placer recolle les parties.',
+        sg_note: 'Ce n’est pas un éditeur de terrain. Pour sculpter, ouvre ensuite Terrain Editor et importe le .bloxdschem.',
+        sg_btn: 'Choisir un fichier Minecraft',
     },
     ja: {
         import: 'Minecraft スケマをインポート', mappings: 'ブロック対応', download: 'ダウンロード',
@@ -65,6 +77,12 @@ const T = {
         preview_too_big: 'プレビュー非表示（面が多すぎ）',
         attribution: '変換ロジック・ブロック表：M2B (RealSlothuLT3) と hansdiewurst/converter より',
         guide: 'Schem Converterが分割出力したパーツ。Schem Placerにまとめてインポートすると、ファイル名の _x…_z… オフセットで自動再結合されます。',
+        sg_title: 'Minecraft → Bloxd',
+        sg_1: '.schem（Sponge）/ .schematic（MCEdit）/ .litematic（Litematica）をドロップ。',
+        sg_2: '対応のないブロックは Dirt になります。「ブロック対応」で変更できます。',
+        sg_3: '.bloxdschem をダウンロード。160チャンク超は ZIP。Schem Placer がパーツを再結合します。',
+        sg_note: '地形エディタではありません。削るなら Terrain Editor で .bloxdschem をインポート。',
+        sg_btn: 'Minecraftファイルを選ぶ',
     },
     ko: {
         import: '마인크래프트 스케매 가져오기', mappings: '블록 매핑', download: '내려받기',
@@ -82,6 +100,12 @@ const T = {
         preview_too_big: '미리보기 숨김 (면이 너무 많음)',
         attribution: '변환 로직·블록 표: M2B (RealSlothuLT3) 및 hansdiewurst/converter',
         guide: 'Schem Converter가 분할 출력한 파트입니다. Schem Placer에 모두 가져오면 파일명의 _x…_z… 오프셋으로 자동 병합됩니다.',
+        sg_title: 'Minecraft → Bloxd',
+        sg_1: '.schem(Sponge) / .schematic(MCEdit) / .litematic(Litematica)을 드롭하세요.',
+        sg_2: '대응 없는 블록은 Dirt가 됩니다. «블록 매핑»에서 바꿀 수 있습니다.',
+        sg_3: '.bloxdschem을 받습니다. 160청크를 넘으면 ZIP. Schem Placer가 파트를 다시 합칩니다.',
+        sg_note: '지형 에디터가 아닙니다. 깎으려면 Terrain Editor에서 .bloxdschem을 가져오세요.',
+        sg_btn: '마인크래프트 파일 선택',
     },
     th: {
         import: 'นำเข้าสเคม Minecraft', mappings: 'การจับคู่บล็อก', download: 'ดาวน์โหลด',
@@ -99,6 +123,12 @@ const T = {
         preview_too_big: 'ซ่อนพรีวิว (หน้าเยอะเกิน)',
         attribution: 'ตรรกะการแปลงและตารางบล็อกจาก M2B (RealSlothuLT3) และ hansdiewurst/converter',
         guide: 'ชิ้นส่วนสเคมที่ Schem Converter แยกออก นำเข้าทั้งหมดใน Schem Placer จะรวมกลับอัตโนมัติด้วยออฟเซ็ต _x…_z… ในชื่อไฟล์',
+        sg_title: 'Minecraft → Bloxd',
+        sg_1: 'วางไฟล์ .schem (Sponge) / .schematic (MCEdit) / .litematic (Litematica)',
+        sg_2: 'บล็อกที่ไม่มีตัวเทียบกลายเป็น Dirt — เปลี่ยนได้ที่การจับคู่บล็อก',
+        sg_3: 'ดาวน์โหลด .bloxdschem เกิน 160 ชังก์จะได้ ZIP Schem Placer รวมชิ้นส่วนกลับ',
+        sg_note: 'นี่ไม่ใช่เครื่องมือปั้นภูมิประเทศ ถ้าจะปั้น เปิด Terrain Editor แล้วนำเข้า .bloxdschem',
+        sg_btn: 'เลือกไฟล์ Minecraft',
     },
 };
 function t(k) {
@@ -339,8 +369,14 @@ function reconvertAll() {
 // ─── Panneau d'infos ───
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+function syncStartGuide() {
+    const g = document.getElementById('start-guide');
+    if (g) g.classList.toggle('hidden', RESULTS.length > 0);
+}
+
 function renderPanel() {
     const p = panel();
+    syncStartGuide();
     if (!RESULTS.length) { p.innerHTML = ''; p.style.display = 'none'; $('btn-download').disabled = true; return; }
     let html = '';
     RESULTS.forEach((r, i) => {
@@ -485,6 +521,20 @@ function saveMappings() {
 }
 
 // ─── Boot ───
+function fillStartGuide() {
+    const title = $('sg-title'), a = $('sg-1'), b = $('sg-2'), c = $('sg-3'), note = $('sg-note'), btn = $('sg-import');
+    if (title) title.textContent = t('sg_title');
+    if (a) a.textContent = t('sg_1');
+    if (b) b.textContent = t('sg_2');
+    if (c) c.textContent = t('sg_3');
+    if (note) note.textContent = t('sg_note');
+    if (btn) btn.textContent = t('sg_btn');
+    const dl = $('btn-download');
+    if (dl) dl.title = t('sg_3');
+}
+
+window.BloxdApplyPrefs = function () { fillStartGuide(); if (RESULTS.length) renderPanel(); };
+
 async function boot() {
     // libellés i18n
     $('lbl-import').textContent = t('import');
@@ -495,6 +545,9 @@ async function boot() {
     $('lbl-map-reset').textContent = t('reset');
     $('lbl-map-close').textContent = t('close');
     $('lbl-map-save').textContent = t('save_reconvert');
+    fillStartGuide();
+    const sgBtn = $('sg-import');
+    if (sgBtn) sgBtn.addEventListener('click', () => $('file-input').click());
 
     loadUserMap();
 

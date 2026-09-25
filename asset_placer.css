@@ -346,6 +346,14 @@ body {
     border-bottom: 1px solid #2c3244;
 }
 
+.format-hint {
+    margin: 0;
+    padding: 8px 12px 10px;
+    color: #c5cde0;
+    font-size: 11.5px;
+    line-height: 1.4;
+    border-bottom: 1px solid #2c3244;
+}
 .left-sidebar .sidebar-header h3 {
     margin: 0;
     padding: 0;

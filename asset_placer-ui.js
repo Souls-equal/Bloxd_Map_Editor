@@ -502,7 +502,7 @@ window.LibraryUI = class LibraryUI {
         uiContainer.innerHTML = `
             <div id="top-toolbar">
                 <div class="toolbar-left">
-                    <button id="btn-import-terrain" class="ui-btn"><span data-i18n="importTerrain">🌄 Import (Terrain)</span></button>
+                    <button id="btn-import-terrain" class="ui-btn" data-i18n-title="importTerrainTitle" title="Load a .bloxdschem as the ground"><span data-i18n="importTerrain">🌄 Terrain (.bloxdschem)</span></button>
                     <input id="input-import-terrain" type="file" accept=".bloxdschem,.json,.schem" style="display:none">
                     <span class="toolbar-sep"></span>
                     <div id="scene-menu-wrap" class="toolbar-dropdown">
@@ -520,7 +520,7 @@ window.LibraryUI = class LibraryUI {
                     </div>
                     <input id="input-import-scene" type="file" accept=".json,application/json" style="display:none">
                     <span class="toolbar-sep"></span>
-                    <button id="btn-export-single" class="ui-btn primary"><span data-i18n="export">📤 Export (Schematic)</span></button>
+                    <button id="btn-export-single" class="ui-btn primary" data-i18n-title="exportTitle" title="Download a .bloxdschem for the game"><span data-i18n="export">📤 Export for Bloxd</span></button>
                 </div>
                 <div class="toolbar-right">
                     <a href="index.html?view=home" target="_top" class="home-corner-btn" title="⌂ Menu principal" onclick="try{localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.localStorage) window.top.localStorage.setItem('bloxdTools.lastView','home'); if(window.top && window.top.BloxdToolsHub && window.top.BloxdToolsHub.goHome){event.preventDefault(); window.top.BloxdToolsHub.goHome();} else if(window.top){try{window.top.postMessage({type:'bloxdTools:goHome'},'*');}catch(e){}}}catch(e){}">🏠</a>
@@ -537,6 +537,7 @@ window.LibraryUI = class LibraryUI {
                 <h3 data-i18n="library">📚 Asset Library</h3>
                 <button id="toggle-sidebar" class="collapse-btn">◀</button>
             </div>
+            <p class="format-hint" data-i18n="formatHint">.bloxdschem = game file · .json = session save · Minecraft .schem → Converter first</p>
             <div class="asset-filter-panel">
                 <div class="asset-filter-title-row">
                     <span class="asset-filter-title" data-i18n="filterTitle">Filter</span>
@@ -719,6 +720,9 @@ window.LibraryUI = class LibraryUI {
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
             el.textContent = window.I18N.t(key);
+        });
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            el.title = window.I18N.t(el.getAttribute('data-i18n-title'));
         });
         const setSearchPH = (id, key) => { const el = document.getElementById(id); if (el) el.placeholder = window.I18N.t(key); };
         setSearchPH('asset-tag-search', 'searchName');
@@ -2328,6 +2332,7 @@ window.addEventListener('DOMContentLoaded', () => {
         new window.InputManager(scene, selectionManager);
         const dragDropManager = new window.DragDropManager(scene, assetManager, selectionManager, canvas);
         const libraryUI = new window.LibraryUI(assetManager, dragDropManager, terrainManager);
+        window.appLibraryUI = libraryUI;
         new window.ExplorerUI(assetManager, terrainManager, selectionManager);
         new window.UIManager(scene, assetManager, selectionManager, dragDropManager);
 

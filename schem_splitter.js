@@ -19,6 +19,12 @@ const T={
         detecting:'Detecting...', noUnits:'No units found',
         autoMerged:'mini-blocks auto-fused by (x,z) column',
         clickHint:'Click a name — or a block in 3D — to select it',
+        sg_title:'Split one schem into many',
+        sg_1:'Import a .bloxdschem that contains several buildings or objects.',
+        sg_2:'Detect & Split finds each object. Full platforms are removed.',
+        sg_3:'Download a .zip: one .bloxdschem per object (unit001, unit002…).',
+        sg_note:'Minecraft files (.schem, .litematic) are not read here. Convert them first.',
+        sg_btn:'Choose a .bloxdschem',
     },
     fr:{
         import:'Importer .bloxdschem', detect:'Détecter & Séparer', download:'Télécharger ZIP',
@@ -29,6 +35,12 @@ const T={
         detecting:'Détection...', noUnits:'Aucune unité trouvée',
         autoMerged:'mini-blocs auto-fusionnés par colonne (x,z)',
         clickHint:'Clique un nom — ou un bloc en 3D — pour le sélectionner',
+        sg_title:'Séparer un schem en plusieurs',
+        sg_1:'Importe un .bloxdschem qui contient plusieurs bâtiments ou objets.',
+        sg_2:'Détecter & Séparer trouve chaque objet. Les plateformes pleines sont retirées.',
+        sg_3:'Télécharge un .zip : un .bloxdschem par objet (unit001, unit002…).',
+        sg_note:'Les fichiers Minecraft (.schem, .litematic) ne se lisent pas ici. Convertis-les d’abord.',
+        sg_btn:'Choisir un .bloxdschem',
     },
     ja:{
         import:'.bloxdschem インポート', detect:'検出&分割', download:'ZIP保存',
@@ -38,6 +50,12 @@ const T={
         merged:'座標でマージ', imported:'インポート済み', nothing:'未読込',
         detecting:'検出中...', noUnits:'ユニットなし',
         autoMerged:'(x,z)列で自動融合', clickHint:'名前または3Dブロックをクリックで選択',
+        sg_title:'1つのスケマを複数に分ける',
+        sg_1:'建物やオブジェクトが複数入った .bloxdschem を読み込みます。',
+        sg_2:'検出&分割が各オブジェクトを見つけます。全面の台は取り除かれます。',
+        sg_3:'ZIPを保存：オブジェクトごとに1つの .bloxdschem（unit001, unit002…）。',
+        sg_note:'Minecraft の .schem / .litematic はここでは読めません。先に変換してください。',
+        sg_btn:'.bloxdschem を選ぶ',
     },
     ko:{
         import:'.bloxdschem 가져오기', detect:'감지&분할', download:'ZIP 저장',
@@ -47,6 +65,12 @@ const T={
         merged:'좌표로 병합', imported:'가져옴', nothing:'로드 안 됨',
         detecting:'감지 중...', noUnits:'유닛 없음',
         autoMerged:'(x,z) 열별 자동 병합', clickHint:'이름 또는 3D 블록 클릭하여 선택',
+        sg_title:'스케매 하나를 여러 개로',
+        sg_1:'건물이나 오브젝트가 여러 개인 .bloxdschem을 가져옵니다.',
+        sg_2:'감지&분할이 각 오브젝트를 찾습니다. 꽉 찬 플랫폼은 제거됩니다.',
+        sg_3:'ZIP 저장: 오브젝트마다 .bloxdschem 1개 (unit001, unit002…).',
+        sg_note:'마인크래프트 .schem / .litematic은 여기서 읽지 않습니다. 먼저 변환하세요.',
+        sg_btn:'.bloxdschem 선택',
     },
     th:{
         import:'นำเข้า .bloxdschem', detect:'ตรวจจับ&แยก', download:'บันทึก ZIP',
@@ -56,6 +80,12 @@ const T={
         merged:'รวมด้วยพิกัด', imported:'นำเข้าแล้ว', nothing:'ยังไม่ได้โหลด',
         detecting:'กำลังตรวจจับ...', noUnits:'ไม่พบยูนิต',
         autoMerged:'รวมอัตโนมัติตามคอลัมน์ (x,z)', clickHint:'คลิกชื่อหรือบล็อก 3D เพื่อเลือก',
+        sg_title:'แยกสเคมาหนึ่งไฟล์เป็นหลายไฟล์',
+        sg_1:'นำเข้า .bloxdschem ที่มีหลายอาคารหรือวัตถุ',
+        sg_2:'ตรวจจับ&แยก จะหาแต่ละวัตถุ แพลตฟอร์มที่เต็มจะถูกลบ',
+        sg_3:'ดาวน์โหลด .zip: หนึ่ง .bloxdschem ต่อวัตถุ (unit001, unit002…)',
+        sg_note:'ไฟล์ Minecraft (.schem, .litematic) อ่านที่นี่ไม่ได้ แปลงก่อน',
+        sg_btn:'เลือก .bloxdschem',
     }
 };
 function t(k){const l=(typeof localStorage!=='undefined'&&localStorage.getItem(LANG_KEY))||'en';return(T[l]||T.en)[k]||k;}
@@ -521,6 +551,7 @@ async function handleImport(files){
     if(!parsed.length)return;
     const schem=parsed.length>1?mergeSchems(parsed):parsed[0];
     currentSchem=schem;
+    syncStartGuide();
     currentVoxels=flattenVoxels(schem);
     currentUnits=null;highlightedUnit=null;
     renderPreview(currentVoxels,null);
@@ -764,6 +795,16 @@ function updateInfo(schem,voxels,units,mergedCount,platformRemoved,autoMerged){
     });
 }
 
+function fillStartGuide(){
+    const set=(id,key)=>{const el=document.getElementById(id); if(el) el.textContent=t(key);};
+    set('sg-title','sg_title'); set('sg-1','sg_1'); set('sg-2','sg_2'); set('sg-3','sg_3'); set('sg-note','sg_note'); set('sg-import','sg_btn');
+}
+function syncStartGuide(){
+    const g=document.getElementById('start-guide');
+    if(g) g.classList.toggle('hidden', !!currentSchem);
+}
+window.BloxdApplyPrefs=function(){ applyI18n(); };
+
 function applyI18n(){
     const btnImp=document.getElementById('btn-import');
     const btnDet=document.getElementById('btn-detect');
@@ -775,6 +816,7 @@ function applyI18n(){
     if(btnDet)btnDet.title=t('detectTitle');
     if(btnDl)btnDl.title=t('downloadTitle');
     if(dropMsg)dropMsg.textContent=t('drop');
+    fillStartGuide();
 }
 
 // ─── Init ───
@@ -782,6 +824,8 @@ function applyI18n(){
 window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&(e.key==='s'||e.key==='S'))e.preventDefault();});
 document.addEventListener('DOMContentLoaded',()=>{
     initPreview();applyI18n();
+    const sgBtn=document.getElementById('sg-import');
+    if(sgBtn) sgBtn.addEventListener('click',()=>document.getElementById('file-input').click());
     document.getElementById('btn-import').addEventListener('click',()=>document.getElementById('file-input').click());
     document.getElementById('file-input').addEventListener('change',async e=>{
         if(e.target.files.length)await handleImport(Array.from(e.target.files));
