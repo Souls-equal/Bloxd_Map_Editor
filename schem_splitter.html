@@ -17,11 +17,24 @@
         <button class="tbtn success" id="btn-download"><span>📦</span> Download ZIP</button>
     </div>
     <canvas id="splitter-canvas"></canvas>
+    <div id="start-guide">
+        <div class="start-card">
+            <h2 id="sg-title">Séparer un schem</h2>
+            <ol>
+                <li id="sg-1"></li>
+                <li id="sg-2"></li>
+                <li id="sg-3"></li>
+            </ol>
+            <p id="sg-note"></p>
+            <button class="tbtn primary" id="sg-import" type="button"></button>
+        </div>
+    </div>
     <div id="info-panel"></div>
     <div id="drop-overlay"><div class="drop-msg">📥 Drop your .bloxdschem here</div></div>
 
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="schem_splitter.js"></script>
+    <script src="welcome.js"></script>
 </body>
 </html>

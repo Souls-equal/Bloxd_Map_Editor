@@ -75,6 +75,10 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
     padding: 8px 12px; font-size: 12px; max-width: 280px;
     pointer-events: none;
 }
+.format-note {
+    margin: 0; padding: 8px 10px 4px; color: var(--muted); font-size: 11px; line-height: 1.4;
+    border-bottom: 1px solid var(--border);
+}
 #mode-indicator b { color: var(--accent); }
 #mode-indicator kbd {
     background: var(--panel-3); border: 1px solid var(--border-light);

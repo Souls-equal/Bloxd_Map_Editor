@@ -27,6 +27,9 @@
     .fa-file-code::before          { content: "📄"; }
     .fa-folder-open::before        { content: "📂"; }
     .fa-save::before               { content: "💾"; }
+    .fa-exchange-alt::before       { content: "🔄"; }
+    .fa-book-open::before          { content: "📖"; }
+    .fa-file-import::before        { content: "📥"; }
     .fa-trash-alt::before          { content: "🗑️"; }
     .fa-eraser::before             { content: "🧽"; }
     .fa-th::before                 { content: "▦"; }
@@ -618,6 +621,7 @@ input[type=range]::-webkit-slider-thumb {
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45);
     transform: translateY(-1px);
 }
+#app-panel .btn { white-space: normal; text-align: center; line-height: 1.25; height: auto; }
 .btn-export {
     background: linear-gradient(135deg, #38bdf8, #0284c7);
     color: #fff;
@@ -823,3 +827,25 @@ input[type=range]::-webkit-slider-thumb {
     backdrop-filter: blur(6px); transition: background .15s, border-color .15s;
 }
 .home-corner-btn:hover { background: rgba(48,56,78,0.95); border-color: var(--accent-cyan); }
+
+/* Guide court + formats (Terrain Editor) */
+.coach-card, .format-card, .ingame-box {
+    background: rgba(74, 168, 255, 0.08);
+    border: 1px solid rgba(74, 168, 255, 0.35);
+    border-radius: 2px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+}
+.format-card { background: rgba(61, 212, 138, 0.07); border-color: rgba(61, 212, 138, 0.4); margin-bottom: 10px; }
+.ingame-box { background: rgba(255, 176, 32, 0.08); border-color: rgba(255, 176, 32, 0.45); margin: 0; }
+.coach-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-weight: 700; font-size: 0.82rem; }
+.guide-chip {
+    background: var(--bg-input); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);
+    border-radius: 2px; padding: 4px 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.guide-chip:hover { background: rgba(74, 168, 255, 0.18); }
+.coach-steps, .format-list { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; }
+.coach-steps li, .format-list li { margin: 3px 0; }
+.format-list code, .coach-steps code { color: var(--accent-cyan); font-size: 0.72rem; }
+.format-lead, .format-hint { color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; margin: 4px 0 8px; }
+.format-hint { margin: 8px 0 0; }

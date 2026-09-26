@@ -67,8 +67,9 @@
                 <span id="schem-count">0</span>
                 <span id="schem-toggle">▼</span>
             </div>
+            <p id="format-note" class="format-note" data-i18n="format_note">Glisse un .bloxdschem, un .bin ou un .zip de parties (_x…_z… sont recollées). Un .schem Minecraft ? D'abord Schem Converter.</p>
             <div id="schem-list-inner">
-                <div id="no-schem-msg" class="muted"><span data-i18n="no_schem">Aucun schem. Glissez-déposez ou</span> <span id="open-hint" data-i18n="open_hint" style="color:var(--accent); cursor:pointer;">cliquez sur Ouvrir</span>.</div>
+                <div id="no-schem-msg" class="muted"><span data-i18n="no_schem">Aucun schem. Glisse un .bloxdschem / .zip, ou</span> <span id="open-hint" data-i18n="open_hint" style="color:var(--accent); cursor:pointer;">cliquez sur Ouvrir</span>.</div>
             </div>
         </div>
 
@@ -106,12 +107,13 @@
         </div>
 
         <!-- Drag & drop overlay -->
-        <div id="drop-overlay"><div class="drop-msg" data-i18n="drop_msg">📥 Déposez vos .bloxdschem ou un .zip ici</div></div>
+        <div id="drop-overlay"><div class="drop-msg" data-i18n="drop_msg">📥 Dépose un .bloxdschem, un .bin ou un .zip de parties</div></div>
 
         <!-- Modale d'export -->
         <div id="export-modal" class="modal-mask">
             <div class="modal-box">
                 <h3 data-i18n="export_title">💾 Exporter</h3>
+                <p class="small" data-i18n="export_format_note" style="color:var(--muted);line-height:1.45;margin:0 0 8px;">Sortie : un .bloxdschem, ou un .zip si plus de 160 chunks (limite Bloxd). « Un seul fichier » seulement pour un autre outil, pas pour le jeu.</p>
                 <div class="export-info" id="export-info"></div>
                 <div class="form-row">
                     <label><span data-i18n="export_base">Nom de base</span>
@@ -145,15 +147,15 @@
                 <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0;">
                     <button class="tbtn primary" id="btn-me-single" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
                         <span data-i18n="me_single">📄 Un seul schem</span>
-                        <div class="small" data-i18n="me_single_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Tous les schems fusionnés en UN seul .bloxdschem (jamais découpé)</div>
+                        <div class="small" data-i18n="me_single_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Tout fusionné en UN .bloxdschem, jamais découpé. Bloxd peut le refuser s'il est trop grand.</div>
                     </button>
                     <button class="tbtn" id="btn-me-separate" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
                         <span data-i18n="me_separate">📑 Plusieurs schems (séparés)</span>
-                        <div class="small" data-i18n="me_separate_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Chaque schem téléchargé séparément dans un .zip</div>
+                        <div class="small" data-i18n="me_separate_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Chaque schem reste séparé, dans un .zip de .bloxdschem.</div>
                     </button>
                     <button class="tbtn" id="btn-me-autosplit" style="justify-content:flex-start;padding:12px 14px;gap:10px;">
                         <span data-i18n="me_autosplit">✂️ Fusion + découpe auto</span>
-                        <div class="small" data-i18n="me_autosplit_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Fusionne tout, puis découpe en ZIP si > 160 chunks (limite Bloxd)</div>
+                        <div class="small" data-i18n="me_autosplit_sub" style="font-weight:normal;opacity:.85;font-size:11px;">Fusionne tout, puis un .zip de parties si > 160 chunks (limite Bloxd). À charger en jeu au même Y.</div>
                     </button>
                 </div>
                 <div class="modal-buttons"><button class="tbtn" id="btn-me-cancel" data-i18n="cancel">Annuler</button></div>
@@ -174,5 +176,6 @@
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="schem_placer.js"></script>
+<script src="welcome.js"></script>
 </body>
 </html>

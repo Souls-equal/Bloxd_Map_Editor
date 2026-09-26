@@ -43,6 +43,27 @@
             <div class="panel-content">
                 <!-- ONGLET 1 : PARAMÈTRES -->
                 <div class="tab-panel active" id="panel-settings">
+                    <div class="coach-card">
+                        <div class="coach-head">
+                            <span data-i18n="coachTitle">3 étapes pour ne pas se perdre</span>
+                            <button type="button" id="btn-open-guide" class="guide-chip" data-i18n="coachMore">Guide des formats</button>
+                        </div>
+                        <ol class="coach-steps">
+                            <li data-i18n="coachStep1">Cet onglet règle la taille, la graine et les biomes.</li>
+                            <li data-i18n="coachStep2">Onglet Éditeur : clic gauche sur la carte 2D pour peindre ou sculpter. La vue 3D sert à regarder.</li>
+                            <li data-i18n="coachStep3">En bas, choisis le bon fichier : .bloxdschem pour le jeu, .json pour reprendre plus tard.</li>
+                        </ol>
+                    </div>
+                    <div class="format-card">
+                        <div class="section-title" style="margin-bottom:6px;"><i class="fas fa-exchange-alt"></i> <span data-i18n="formatTitle">Quel fichier pour quoi ?</span></div>
+                        <p class="format-lead" data-i18n="formatLead">Trois formats différents. Les mélanger est la cause n°1 des erreurs.</p>
+                        <ul class="format-list">
+                            <li><code>.bloxdschem</code> <span data-i18n="formatBloxd">fichier du jeu. Charge-le avec //schematic load nom (sans l'extension).</span></li>
+                            <li><code>.zip</code> <span data-i18n="formatZip">seulement si le monde est trop grand : plusieurs .bloxdschem + un guide. Charge chaque partie au même Y.</span></li>
+                            <li><code>.json</code> <span data-i18n="formatJson">sauvegarde pour rééditer ici. Bloxd ne charge pas ce fichier.</span></li>
+                            <li><code>.schem</code> <span data-i18n="formatMc">Minecraft (.schem, .schematic, .litematic) : d'abord Schem Converter, qui produit un .bloxdschem.</span></li>
+                        </ul>
+                    </div>
                     <div class="form-section">
                         <div class="section-title"><i class="fas fa-globe"></i> <span data-i18n="secDimensions">Dimensions du Monde</span></div>
                         <div class="form-grid-2">
@@ -269,18 +290,19 @@
 
             </div>
 
-            <div style="padding: 16px 20px;">
+            <div style="padding: 16px 20px 8px;">
                 <button class="btn btn-export" id="btn-download-project" data-i18n="btnDownloadZip">
-                    <i class="fas fa-file-export"></i> 👉 Télécharger le projet (ZIP)
+                    <i class="fas fa-file-export"></i> 👉 Télécharger pour Bloxd (.bloxdschem)
                 </button>
+                <p class="format-hint" data-i18n="formatDownloadHint">Petit monde → 1 .bloxdschem. Monde trop grand → un .zip. Le .json n'est pas inclus : c'est le bouton en dessous.</p>
             </div>
 
             <div style="padding: 0 20px 16px;">
-                <div class="section-title" style="margin-bottom:8px;"><i class="fas fa-people-group"></i> <span data-i18n="secTeamShare">Partage d'équipe</span></div>
+                <div class="section-title" style="margin-bottom:8px;"><i class="fas fa-save"></i> <span data-i18n="secTeamShare">Reprendre plus tard</span></div>
                 <div class="action-buttons" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    <button class="btn btn-secondary" id="btn-export-project-json" title="Sauvegarde complète (config + biomes + modifications) à partager avec l'équipe" style="flex:1 1 100%;"><i class="fas fa-file-code"></i> <span data-i18n="btnExportProjectJson">Exporter le projet (.json)</span></button>
-                    <button class="btn btn-secondary" id="btn-import-project-json" style="flex:1;"><i class="fas fa-file-import"></i> <span data-i18n="btnImportProjectJson">Importer (.json)</span></button>
-                    <button class="btn btn-secondary" id="btn-import-bloxdschem" title="Reconstruit un terrain (relief) à partir d'un .bloxdschem existant, pour continuer à l'éditer" style="flex:1;"><i class="fas fa-cube"></i> <span data-i18n="btnImportBloxdschem">Importer (.bloxdschem)</span></button>
+                    <button class="btn btn-secondary" id="btn-export-project-json" data-i18n-title="titleExportJson" title="Sauvegarde pour rééditer ici. Ce n'est pas un fichier que Bloxd peut charger." style="flex:1 1 100%;"><i class="fas fa-file-code"></i> <span data-i18n="btnExportProjectJson">Sauver le projet (.json)</span></button>
+                    <button class="btn btn-secondary" id="btn-import-project-json" data-i18n-title="titleImportJson" title="Rouvre un projet .json enregistré avec le bouton du dessus." style="flex:1;"><i class="fas fa-file-import"></i> <span data-i18n="btnImportProjectJson">Reprendre un .json</span></button>
+                    <button class="btn btn-secondary" id="btn-import-bloxdschem" data-i18n-title="titleImportSchem" title="Reconstruit le relief à partir d'un .bloxdschem (pas les bâtiments). Un .schem Minecraft doit d'abord passer par Schem Converter." style="flex:1;"><i class="fas fa-cube"></i> <span data-i18n="btnImportBloxdschem">Importer un terrain (.bloxdschem)</span></button>
                 </div>
                 <input type="file" id="input-import-project-json" accept=".json" style="display:none">
                 <input type="file" id="input-import-bloxdschem" accept=".bloxdschem" style="display:none">
@@ -321,7 +343,7 @@
                     <button class="toolbar-btn" id="btn-3d-reset" data-i18n="btn3dReset"><i class="fas fa-video"></i> Caméra</button>
                     <button class="toolbar-btn" id="btn-3d-mesh">🧱 Voxel</button>
                     <button class="toolbar-btn active" id="btn-3d-water" data-i18n="btn3dWater"><i class="fas fa-water"></i> Eau</button>
-                    <span class="fly-hint" data-i18n="flyHint" style="margin-left:auto;font-size:0.72rem;color:var(--text-muted);align-self:center;white-space:nowrap;">🎮 ZQSD + Espace/Ctrl pour voler</span>
+                    <span class="fly-hint" data-i18n="flyHint" style="margin-left:auto;font-size:0.72rem;color:var(--text-muted);align-self:center;white-space:normal;text-align:right;max-width:280px;">🎮 ZQSD ou WASD · touches dans ⚙️ Paramètres</span>
                 </div>
                 <div id="map3d-container"></div>
             </section>
@@ -332,29 +354,37 @@
     <div class="modal-overlay" id="export-modal">
         <div class="modal-box">
             <header class="modal-header">
-                <div class="modal-title"><i class="fas fa-file-code" style="color: var(--accent-cyan);"></i> <span data-i18n="modalTitle">Exportation du Projet Bloxd</span></div>
+                <div class="modal-title"><i class="fas fa-file-code" style="color: var(--accent-cyan);"></i> <span data-i18n="modalTitle">Télécharger pour Bloxd.io</span></div>
                 <button class="close-btn" id="btn-close-modal"><i class="fas fa-times"></i></button>
             </header>
             <div class="modal-body">
                 <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5;" data-i18n="modalDesc">
-                    Téléchargez directement votre <strong>schématique (.bloxdschem)</strong> généré en temps réel sans avoir besoin de Python ni de ligne de commande ! Si le monde est trop grand, il sera automatiquement découpé en plusieurs fichiers regroupés dans un dossier ZIP.
+                    Tu obtiens un <strong>.bloxdschem</strong> prêt pour le jeu. S'il dépasse ~200 chunks, il est découpé en plusieurs fichiers dans un <strong>.zip</strong>, avec un guide. Le .json de sauvegarde n'est pas créé ici.
                 </p>
+                <div class="ingame-box">
+                    <div class="section-title" style="margin-bottom:6px;" data-i18n="modalIngameTitle">En jeu</div>
+                    <ol class="coach-steps">
+                        <li data-i18n="modalIngame1">Place le .bloxdschem dans le dossier schématiques de Bloxd.</li>
+                        <li data-i18n="modalIngame2">Ouvre le tchat et tape //schematic load nomdufichier (sans .bloxdschem).</li>
+                        <li data-i18n="modalIngame3">Si tu as un .zip : ouvre-le, lis le guide, et charge chaque partie en restant à la même hauteur Y. Sinon les morceaux se décalent.</li>
+                    </ol>
+                </div>
 
                 <div class="form-group">
-                    <label class="form-label" data-i18n="modalFilenameLabel">Nom du fichier <span style="color: var(--text-muted); font-weight: 400;">(si un seul schéma)</span></label>
+                    <label class="form-label" data-i18n="modalFilenameLabel">Nom du fichier (si un seul .bloxdschem)</label>
                     <input type="text" class="input-text" id="export-filename" placeholder="monde_personnalise" value="monde_personnalise">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" data-i18n="modalFoldernameLabel">Nom du dossier <span style="color: var(--text-muted); font-weight: 400;">(si plusieurs schémas)</span></label>
+                    <label class="form-label" data-i18n="modalFoldernameLabel">Nom du dossier dans le .zip (si plusieurs parties)</label>
                     <input type="text" class="input-text" id="export-foldername" placeholder="schematics_decoupes" value="schematics_decoupes">
                     <p style="color: var(--text-muted); font-size: 0.78rem; margin: 6px 0 0;" data-i18n="modalFolderDesc">
-                        Chaque schéma du dossier sera nommé <code>numéro_[posX,posY,posZ]</code> (ex : <code>1_[0,0,0]</code>).
+                        Chaque partie s'appelle numéro_[posX,posY,posZ] (ex. 1_[0,0,0]). Ce sont les coordonnées où te placer avant //schematic load.
                     </p>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" data-i18n="modalAnchorLabel">Position de l'angle de collage <span style="color: var(--text-muted); font-weight: 400;">(coin où vous poserez le 1er schéma en jeu)</span></label>
+                    <label class="form-label" data-i18n="modalAnchorLabel">Coin de collage en jeu (où tu te tiens pour charger la 1re partie)</label>
                     <div class="form-grid-2" style="grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
                         <input type="number" class="input-text" id="export-anchor-x" placeholder="X" value="0" step="1">
                         <input type="number" class="input-text" id="export-anchor-y" placeholder="Y" value="0" step="1">
@@ -375,10 +405,10 @@
                 <div class="form-group" style="background: rgba(16, 185, 129, 0.08); border: 1px solid var(--accent-green); border-radius: 2px; padding: 10px 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
                         <input type="checkbox" id="export-single-file">
-                        <span style="font-weight: 600;" data-i18n="modalSingleFile">📄 Forcer un seul fichier .bloxdschem</span>
+                        <span style="font-weight: 600;" data-i18n="modalSingleFile">📄 Forcer un seul .bloxdschem (sans découpe)</span>
                     </label>
                     <p style="color: var(--text-muted); font-size: 0.78rem; margin: 6px 0 0 24px;" data-i18n="modalSingleFileDesc">
-                        Exporte tout le monde en un unique schématique, sans découpage. Idéal pour les outils externes (autres sites web). ⚠️ Bloxd.io refusera ce fichier s'il dépasse ~200 chunks : garde la case décochée pour importer en jeu.
+                        Tout le monde dans un seul fichier. Utile pour un autre site. Bloxd.io refusera le fichier s'il dépasse ~200 chunks : laisse décoché pour jouer.
                     </p>
                 </div>
             </div>
@@ -400,8 +430,59 @@
          du point regardé, matériaux figés, chunks 100% couverts désactivés).
          ============================================================ -->
 
+    <!-- Guide des formats (réouvrable) -->
+    <div class="modal-overlay" id="guide-modal">
+        <div class="modal-box">
+            <header class="modal-header">
+                <div class="modal-title"><i class="fas fa-book-open" style="color: var(--accent-cyan);"></i> <span data-i18n="guideTitle">Guide — Terrain Editor</span></div>
+                <button class="close-btn" id="btn-close-guide" type="button"><i class="fas fa-times"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="section-title" data-i18n="guideUseTitle">Utiliser l'éditeur</div>
+                <ol class="coach-steps">
+                    <li data-i18n="coachStep1">Cet onglet règle la taille, la graine et les biomes.</li>
+                    <li data-i18n="coachStep2">Onglet Éditeur : clic gauche sur la carte 2D pour peindre ou sculpter. La vue 3D sert à regarder.</li>
+                    <li data-i18n="guideStep3d">ZQSD ou WASD + Espace/Ctrl pour voler en 3D. Les touches se changent dans ⚙️ Paramètres.</li>
+                    <li data-i18n="coachStep3">En bas, choisis le bon fichier : .bloxdschem pour le jeu, .json pour reprendre plus tard.</li>
+                </ol>
+                <div class="section-title" data-i18n="guideFmtTitle">Échanger des schémas</div>
+                <ul class="format-list">
+                    <li><code>.bloxdschem</code> <span data-i18n="formatBloxd">fichier du jeu. Charge-le avec //schematic load nom (sans l'extension).</span></li>
+                    <li><code>.zip</code> <span data-i18n="formatZip">seulement si le monde est trop grand : plusieurs .bloxdschem + un guide. Charge chaque partie au même Y.</span></li>
+                    <li><code>.json</code> <span data-i18n="formatJson">sauvegarde pour rééditer ici. Bloxd ne charge pas ce fichier.</span></li>
+                    <li><code>.schem</code> <span data-i18n="formatMc">Minecraft (.schem, .schematic, .litematic) : d'abord Schem Converter, qui produit un .bloxdschem.</span></li>
+                </ul>
+                <p class="format-lead" data-i18n="guideKeys">Langue et touches : 🏠 puis ⚙️ Paramètres. Une fenêtre le rappelle au premier lancement.</p>
+            </div>
+            <footer class="modal-footer">
+                <button class="btn btn-export" id="btn-close-guide-ok" type="button" style="width:auto;" data-i18n="guideClose">Fermer</button>
+            </footer>
+        </div>
+    </div>
+
     <script src="terrain_editor_babylon.min.js"></script>
     <!-- Code propre + JSZip (fusionné) -->
     <script src="terrain_editor.js"></script>
+    <script src="welcome.js"></script>
+    <script>
+        (function () {
+            function openGuide() {
+                var m = document.getElementById('guide-modal');
+                if (m) m.classList.add('active');
+            }
+            function closeGuide() {
+                var m = document.getElementById('guide-modal');
+                if (m) m.classList.remove('active');
+            }
+            var openBtn = document.getElementById('btn-open-guide');
+            if (openBtn) openBtn.addEventListener('click', openGuide);
+            var closeBtn = document.getElementById('btn-close-guide');
+            if (closeBtn) closeBtn.addEventListener('click', closeGuide);
+            var closeOk = document.getElementById('btn-close-guide-ok');
+            if (closeOk) closeOk.addEventListener('click', closeGuide);
+            var modal = document.getElementById('guide-modal');
+            if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closeGuide(); });
+        })();
+    </script>
 </body>
 </html>

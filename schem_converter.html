@@ -17,6 +17,18 @@
         <button class="tbtn success" id="btn-download" disabled><span>💾</span> <span id="lbl-download">Download</span></button>
     </div>
     <canvas id="converter-canvas"></canvas>
+    <div id="start-guide">
+        <div class="start-card">
+            <h2 id="sg-title">Minecraft → Bloxd</h2>
+            <ol>
+                <li id="sg-1"></li>
+                <li id="sg-2"></li>
+                <li id="sg-3"></li>
+            </ol>
+            <p id="sg-note"></p>
+            <button class="tbtn primary" id="sg-import" type="button"></button>
+        </div>
+    </div>
     <div id="info-panel"></div>
     <div id="drop-overlay"><div class="drop-msg" id="drop-msg">📥 Drop .schem / .schematic / .litematic here</div></div>
 
@@ -39,5 +51,6 @@
     <script src="block_colors.js"></script>
     <script src="schem_converter-core.js"></script>
     <script src="schem_converter.js"></script>
+    <script src="welcome.js"></script>
 </body>
 </html>
