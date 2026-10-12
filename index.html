@@ -7,6 +7,17 @@
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAKlBMVEVHcEwAAAD///+mBwWPj4+6urr/AgDJBALgEhDdCQcAADVAQEAAANMwMDDLTWdNAAAAAXRSTlMAQObYZgAAAEVJREFUCNdjYMAGGAUgtKBkIYRvOK0dLMRomZYBFmKckZYGFhI2BgJDIEMkSElJ1RHECFwNZUSdxsmIvQthMAoCgQDCZgAI7xCncUnAaQAAAABJRU5ErkJggg==">
     <link rel="stylesheet" href="hub.css">
     <link rel="stylesheet" href="shell.css">
+    <!--
+        PERF — le hub est léger, mais il ouvre chaque éditeur dans une iframe.
+        Ces `<link>` chauffent les connexions vers les CDN utilisés par les
+        iframes (DNS + TLS = 100-300 ms gagnés d'avance sur le 1ᵉʳ onglet) et
+        le Service Worker met en cache le moteur 3D + la bibliothèque d'assets :
+        à la 2ᵉ visite, un éditeur s'ouvre sans attendre le réseau.
+    -->
+    <link rel="preconnect" href="https://cdn.babylonjs.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.babylonjs.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 </head>
 <body>
 <header>
@@ -178,8 +189,9 @@
     </div>
 </div>
 
-<script src="hub.js"></script>
-<script src="welcome.js"></script>
-<script src="shell.js"></script>
+<script defer src="hub.js"></script>
+<script defer src="welcome.js"></script>
+<script defer src="shell.js"></script>
+<script defer src="app-cache.js"></script>
 </body>
 </html>

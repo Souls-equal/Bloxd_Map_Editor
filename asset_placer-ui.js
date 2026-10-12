@@ -9,10 +9,27 @@
 
 /**
  * asset_placer-schematiclibraryloader.js
- * Charge les schematics depuis manifest.json avec détection automatique
- * des fichiers manquants (pattern tree001-999, house001-999, rock001-999).
- * Les fichiers absents sont ignorés sans erreur ; un résumé compressé
- * est loggé à la fin (ex: "Missing trees: 121-999").
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Remplit la bibliothèque d'assets de l'Asset Placer.
+ *
+ * ⚡ STRATÉGIE 1 — INDEX (par défaut)
+ *   `schems/index.json` (généré par `tools/build-asset-index.mjs`) contient la
+ *   liste complète des assets avec, pour chacun, son fichier, sa catégorie, ses
+ *   dimensions et son nombre de blocs. La bibliothèque est donc affichée et
+ *   filtrable en UNE requête (~12 Ko gzippé), sans rien télécharger d'autre.
+ *   Le .bloxdschem d'un asset n'est téléchargé + parsé qu'au moment où on le
+ *   pose (ou au survol, en préchargement).
+ *
+ * 🐢 STRATÉGIE 2 — BALAYAGE DU MANIFEST (repli)
+ *   Si l'index est absent (fork, dépôt sans build), on retombe sur l'ancien
+ *   comportement : essai des fichiers `prefix001…999`. Mais en parallèle
+ *   (12 requêtes à la fois) et avec le cache HTTP, au lieu de ~1000 requêtes
+ *   séquentielles `no-store` — c'est ce balayage séquentiel qui mettait
+ *   l'éditeur à genoux.
+ *
+ * Mémoire : avant, les 922 assets étaient tous décodés en objets {x,y,z,id}
+ * (~1,9 M d'objets, plus de 100 Mio) dès l'ouverture de l'onglet. Maintenant :
+ * uniquement ceux qui sont réellement posés.
  */
 
 window.SchematicLibraryLoader = class SchematicLibraryLoader {
@@ -24,184 +41,178 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         this.maxPreviewBlocks = 120000;
         this.manifestPath = 'manifest.json';
         this.schemsDir = 'schems/';
-        this.maxConsecutiveMisses = 8; // stop après 8 404 consécutifs
+        this.indexPath = 'schems/index.json';
+        this.maxConsecutiveMisses = 8; // repli : stop après 8 trous consécutifs
+        this.concurrency = 12;         // requêtes réseau simultanées max
+        this.useCache = true;          // laisse le navigateur (et le Service Worker) recycler
+
+        this._entries = new Map();     // nom d'affichage -> enregistrement d'index
+        this._inflight = new Map();    // nom -> Promise de chargement en vol
+        this._active = 0;              // requêtes en cours
+        this._waiters = [];            // file d'attente de slots réseau
+        this._uiTimer = 0;
+        this._uiPending = null;        // Set de noms à annoncer à l'UI
+        this.usedFallbackScan = false;
     }
 
+    /* ══════════════════════ Point d'entrée ══════════════════════ */
+
+    /** @returns {Promise<number>} nombre d'assets rendus disponibles */
     async loadFromProjectFolder() {
-        const entries = await this._loadManifestEntries();
-        if (!entries.length) return 0;
-
-        let totalLoaded = 0;
-
-        // Traite chaque "groupe" (pattern ou fichier unique) séparément
-        for (const group of entries) {
-            if (group._isPattern) {
-                totalLoaded += await this._loadPatternGroup(group);
-            } else {
-                totalLoaded += await this._loadSingleEntry(group);
-            }
-        }
-        return totalLoaded;
+        const indexed = await this.loadFromIndex();
+        if (indexed > 0) return indexed;
+        this.usedFallbackScan = true;
+        return await this.loadFromManifestScan();
     }
 
     /**
-     * Charge un groupe pattern (ex: tree001 → tree999).
-     * Essaie séquentiellement, s'arrête après maxConsecutiveMisses 404.
-     * Logge les fichiers manquants de façon compressée.
+     * Chemin rapide : un seul fetch, aucune géométrie décodée.
+     * Les entrées sont marquées `pending` ; `ensureTemplateLoaded()` les
+     * complétera à la demande.
      */
+    async loadFromIndex() {
+        let data = null;
+        try {
+            const res = await fetch(this.indexPath, { cache: this.useCache ? 'default' : 'no-store' });
+            if (!res || !res.ok) return 0;
+            data = await res.json();
+        } catch (e) { return 0; }
+        // Un index d'un autre schéma ne doit jamais être mal interprété : on
+        // ignore alors proprement et le balayage du manifest prend le relais.
+        if (data.schema !== undefined && data.schema !== 1) {
+            console.warn(`[Bloxd Tools] schems/index.json : schéma ${data.schema} non reconnu (attendu 1) — balayage du manifest utilisé à la place.`);
+            return 0;
+        }
+        const list = data && Array.isArray(data.assets) ? data.assets : null;
+        if (!list || !list.length) return 0;
+
+        let n = 0;
+        for (const e of list) {
+            if (!e || !e.n || !e.f) continue;
+            const name = this._makeUniqueTemplateName(e.n);
+            const type = typeof e.t === 'string' ? e.t.split(/\s+/).filter(Boolean) : (Array.isArray(e.t) ? e.t : []);
+            this._entries.set(name, e);
+            this.assetManager.registerTemplateMeta(name, {
+                sourcePath: this.schemsDir + e.f,
+                type,
+                biome: [],
+                size: { x: e.x | 0, y: e.y | 0, z: e.z | 0 },
+                blockCount: e.b | 0,
+                bytes: e.s | 0,
+                categories: type.map(v => `type:${v}`),
+                author: '', description: '', tags: [],
+                pending: true
+            });
+            n++;
+        }
+        this._flushUi(true);
+        console.log(`🗂️ ${n} assets listés depuis l'index (aucun fichier téléchargé, ${Date.now() - (this._t0 || (this._t0 = Date.now()))} ms).`);
+        return n;
+    }
+
+    /**
+     * REPLI (pas d'index) : balaye les plages du manifest, en parallèle.
+     * Un lot complet de `concurrency` 404 consécutifs arrête le groupe.
+     */
+    async loadFromManifestScan() {
+        const entries = await this._loadManifestEntries();
+        if (!entries.length) return 0;
+        let total = 0;
+        for (const group of entries) {
+            if (group._isPattern) total += await this._loadPatternGroup(group);
+            else total += await this._loadSingleEntry(group);
+            this._flushUi(true);
+        }
+        return total;
+    }
+
+    /** Construit la liste des candidats d'un groupe, puis les charge en parallèle. */
     async _loadPatternGroup(group) {
         const { prefix, from, to, pad = 3, type } = group;
         const ext = '.bloxdschem';
-        let loaded = 0;
-        let consecutiveMisses = 0;
-        let firstMissing = -1;
-        let lastMissing = -1;
-        const missingRanges = []; // [{start, end}]
-        const loadedNums = [];
-        const pending = [];       // n° sautés pour échec transitoire (à réessayer)
-
+        const candidates = [];
         for (let n = from; n <= to; n++) {
             const numStr = String(n).padStart(pad, '0');
-            const fileName = `${this.schemsDir}${prefix}${numStr}${ext}`;
-            const name = `${prefix}${numStr}`;
-
-            try {
-                const res = await this._fetchWithRetry(fileName);
-                // Vrai 404 = fichier réellement absent → compte vers l'arrêt anticipé.
-                if (res && res.status === 404) throw new Error('404');
-                // Toute autre réponse non-ok après retries = échec TRANSITOIRE :
-                // on saute ce fichier SANS le compter comme un trou (sinon une série
-                // de hoquets réseau ferait abandonner tout le reste de la plage alors
-                // que les fichiers existent bel et bien).
-                if (!res || !res.ok) { pending.push(n); continue; }
-
-                const buffer = await res.arrayBuffer();
-                const schem = this._parseBuffer(buffer, fileName);
-                if (!schem || !schem.blocks || !schem.blocks.length) throw new Error('empty');
-
-                const uniqueName = this._makeUniqueTemplateName(name);
-                // Chargement LAZY : on stocke le schem + métadonnées SANS créer le mesh
-                // (le mesh est créé au 1er placement via AssetManager._ensureSourceMesh).
-                const meta = this._normalizeMetadata({ type, file: fileName }, fileName, schem);
-                this.assetManager.registerTemplate(uniqueName, null, schem, meta);
-                loaded++;
-                loadedNums.push(n);
-                consecutiveMisses = 0;
-
-                // Met à jour la population de la bibliothèque de temps en temps
-                if (loaded % 10 === 0 && this.libraryUI) this.libraryUI.populateLibrary();
-                await this._yieldToBrowser();
-            } catch (err) {
-                // Fichier manquant (404 confirmé) ou invalide → compte vers l'arrêt.
-                consecutiveMisses++;
-                if (firstMissing < 0) firstMissing = n;
-                lastMissing = n;
-
-                // Stop après trop de 404 consécutifs
-                if (consecutiveMisses >= this.maxConsecutiveMisses) {
-                    // Le reste est considéré manquant
-                    missingRanges.push({ start: firstMissing, end: to });
-                    break;
-                }
-            }
+            candidates.push({ n, name: `${prefix}${numStr}`, file: `${this.schemsDir}${prefix}${numStr}${ext}` });
         }
+        const batchSize = Math.max(this.concurrency, 8);
+        let loaded = 0, missRun = 0, stopped = false;
+        const transient = [];        // trous causés par un hoquet réseau → réessayés une fois
 
-        // 2ᵉ passe : réessaie les fichiers sautés pour échec TRANSITOIRE (jamais
-        // comptés comme trous). Se produit rarement, mais garantit qu'un hoquet
-        // réseau ne laisse pas un asset absent de la bibliothèque.
-        if (pending.length) {
-            for (const n of pending) {
-                const numStr = String(n).padStart(pad, '0');
-                const fileName = `${this.schemsDir}${prefix}${numStr}${ext}`;
-                const name = `${prefix}${numStr}`;
+        for (let i = 0; i < candidates.length && !stopped; i += batchSize) {
+            const batch = candidates.slice(i, i + batchSize);
+            // Les téléchargements partent ensemble (limités par le sémaphore) ;
+            // le décodage, lui, reste séquentiel pour ne pas saturer le thread
+            // principal — c'est lui qui doit aussi peindre l'interface.
+            const fetched = await Promise.all(batch.map(c => this._fetch(c.file, 2)));
+            let confirmed404 = 0;
+            for (let j = 0; j < batch.length; j++) {
+                const res = fetched[j], c = batch[j];
+                if (!res) { transient.push(c); continue; }          // échec réseau : à retenter
+                if (!res.ok) {                                       // 404 confirmé : absent
+                    if (res.status === 404) { confirmed404++; missRun++; }
+                    else transient.push(c);
+                    continue;
+                }
                 try {
-                    const res = await this._fetchWithRetry(fileName, 3);
-                    if (!res || !res.ok) continue;
                     const buffer = await res.arrayBuffer();
-                    const schem = this._parseBuffer(buffer, fileName);
-                    if (!schem || !schem.blocks || !schem.blocks.length) continue;
-                    const uniqueName = this._makeUniqueTemplateName(name);
-                    const meta = this._normalizeMetadata({ type, file: fileName }, fileName, schem);
+                    const schem = this._parseBuffer(buffer, c.file);
+                    if (!schem || !schem.blocks || !schem.blocks.length) { missRun++; continue; }
+                    missRun = 0;
+                    const uniqueName = this._makeUniqueTemplateName(c.name);
+                    const meta = this._normalizeMetadata({ type, file: c.file }, c.file, schem);
                     this.assetManager.registerTemplate(uniqueName, null, schem, meta);
                     loaded++;
-                    loadedNums.push(n);
-                } catch (e) { /* définitivement absent */ }
-                await this._yieldToBrowser();
+                    this._uiAnnounce(uniqueName);
+                } catch (e) { missRun++; }
+            }
+            this._flushUi();
+            // Arrêt anticipé : une pleine fournée de trous confirmés = fin de la plage.
+            if (confirmed404 >= batch.length || missRun >= this.maxConsecutiveMisses * 2) stopped = true;
+        }
+
+        // Filet de sécurité : un hoquet réseau ne doit pas faire disparaître un
+        // asset de la bibliothèque (comportement hérité de l'ancien chargeur).
+        for (let i = 0; i < transient.length; i += batchSize) {
+            const batch = transient.slice(i, i + batchSize);
+            const fetched = await Promise.all(batch.map(c => this._fetch(c.file, 2)));
+            for (let j = 0; j < batch.length; j++) {
+                const res = fetched[j];
+                if (!res || !res.ok) continue;
+                try {
+                    const schem = this._parseBuffer(await res.arrayBuffer(), batch[j].file);
+                    if (!schem || !schem.blocks || !schem.blocks.length) continue;
+                    const uniqueName = this._makeUniqueTemplateName(batch[j].name);
+                    const meta = this._normalizeMetadata({ type, file: batch[j].file }, batch[j].file, schem);
+                    this.assetManager.registerTemplate(uniqueName, null, schem, meta);
+                    loaded++;
+                    this._uiAnnounce(uniqueName);
+                } catch (e) { /* fichier définitivement inexploitable */ }
             }
         }
-
-        // Si on a eu des manquants dispersés (pas en fin de liste), les compresser
-        if (consecutiveMisses > 0 && consecutiveMisses < this.maxConsecutiveMisses) {
-            missingRanges.push({ start: firstMissing, end: lastMissing });
-        }
-
-        // Log compressé
-        this._logGroupSummary(prefix, type, loaded, from, to, missingRanges, loadedNums);
-
-        if (this.libraryUI) this.libraryUI.populateLibrary();
+        this._flushUi(true);
+        this._logGroupSummary(prefix, type, loaded);
         return loaded;
     }
 
-    /**
-     * Affiche un résumé compressé pour un groupe.
-     * Ex: "📦 trees: 120 loaded, missing: 121-999"
-     *     "📦 rocks: 98 loaded, missing: 3, 15, 101-999"
-     */
-    _logGroupSummary(prefix, type, loaded, from, to, missingRanges, loadedNums) {
-        if (loaded === 0 && missingRanges.length === 0) {
-            console.log(`📦 ${type}s: 0 found (none in manifest range ${from}-${to})`);
-            return;
-        }
-
-        // Calcule les ranges manquants à partir des numéros chargés
-        const loadedSet = new Set(loadedNums);
-        const gaps = [];
-        let gapStart = -1;
-
-        for (let n = from; n <= to; n++) {
-            if (!loadedSet.has(n)) {
-                if (gapStart < 0) gapStart = n;
-            } else {
-                if (gapStart >= 0) {
-                    gaps.push({ start: gapStart, end: n - 1 });
-                    gapStart = -1;
-                }
-            }
-        }
-        // Si on s'est arrêté tôt (consecutiveMisses), le reste est manquant
-        if (gapStart >= 0) gaps.push({ start: gapStart, end: to });
-
-        // Compacte les ranges en texte
-        const gapStr = gaps.length === 0
-            ? 'none'
-            : gaps.map(g => g.start === g.end ? `${g.start}` : `${g.start}-${g.end}`).join(', ');
-
-        console.log(`📦 ${type}s: ${loaded} loaded, missing: ${gapStr}`);
-    }
-
-    /** Charge une entrée unique (non-pattern) du manifest. */
     async _loadSingleEntry(entry) {
         try {
             const fileName = entry.file || entry.path || entry.url || entry.src;
             if (!fileName || !this._isSupported(fileName)) return 0;
-
             const schem = await this._loadSchematic(fileName);
             if (!schem || !schem.blocks || !schem.blocks.length) return 0;
-
             const baseName = entry.name || this._nameFromPath(fileName);
             const uniqueName = this._makeUniqueTemplateName(baseName);
             const meta = this._normalizeMetadata(entry, fileName, schem);
             this.assetManager.registerTemplate(uniqueName, null, schem, meta);
-            if (this.libraryUI) this.libraryUI.populateLibrary();
+            this._uiAnnounce(uniqueName);
             return 1;
-        } catch (err) {
-            return 0;
-        }
+        } catch (err) { return 0; }
     }
 
     async _loadManifestEntries() {
         try {
-            const res = await fetch(this.manifestPath, { cache: 'no-store' });
+            const res = await fetch(this.manifestPath, { cache: 'default' });
             if (!res.ok) return [];
             const data = await res.json();
             const raw = Array.isArray(data) ? data : (data.schematics || data.files || []);
@@ -213,8 +224,207 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         } catch { return []; }
     }
 
+    _logGroupSummary(prefix, type, loaded) {
+        console.log(`📦 ${type || prefix}s: ${loaded} chargé(s) par balayage du manifest — régénérez l'index (\`node tools/build-asset-index.mjs\`) pour un démarrage instantané.`);
+    }
+
+    /* ══════════════════ Chargement à la demande ══════════════════ */
+
+    /**
+     * S'assure qu'UN asset est réellement utilisable (blocs décodés).
+     * Idempotent et déduppliqué : deux appels simultanés ne déclenchent
+     * qu'un seul téléchargement. Renvoie true si l'asset est prêt.
+     */
+    async ensureTemplateLoaded(name) {
+        if (!name) return false;
+        if (this.assetManager.hasTemplateData && this.assetManager.hasTemplateData(name)) return true;
+        if (this.assetManager.hasTemplate(name)) return true;
+        const running = this._inflight.get(name);
+        if (running) return running;
+        const p = this._loadTemplateNow(name)
+            .catch(() => false)
+            .finally(() => this._inflight.delete(name));
+        this._inflight.set(name, p);
+        return p;
+    }
+
+    /** Charge plusieurs assets en parallèle (restauration de session…). */
+    async ensureTemplatesLoaded(names) {
+        const uniq = [...new Set(names.filter(Boolean))].filter(n => !this.assetManager.hasTemplate(n));
+        if (!uniq.length) return 0;
+        const results = await Promise.all(uniq.map(n => this.ensureTemplateLoaded(n)));
+        return results.filter(Boolean).length;
+    }
+
+    /**
+     * Téléchargement discret d'avance (survol d'une carte de la bibliothèque) :
+     * ne bloque jamais l'appelant, ne lève jamais d'erreur.
+     */
+    prefetch(name) {
+        if (!name || this.assetManager.hasTemplate(name) || this._inflight.has(name)) return;
+        this.ensureTemplateLoaded(name).catch(() => {});
+    }
+
+    async _loadTemplateNow(name) {
+        const entry = this._entries.get(name);
+        const candidates = [];
+        if (entry && entry.f) candidates.push(this.schemsDir + entry.f);
+        // Filet de sécurité pour les noms absents de l'index (session sauvegardée
+        // avec un nom dé-doublonné « base 2 », fork au schéma d'index différent…) :
+        // on retente le nom exact, le nom sans suffixe, puis les extensions.
+        const baseNames = [name];
+        const dedup = /^(.*\S)\s+(\d+)$/.exec(name);
+        if (dedup) baseNames.push(dedup[1]);
+        for (const base of baseNames) {
+            if (/\.(bloxdschem|json|schem)$/i.test(base)) {
+                const p = `${this.schemsDir}${base}`;
+                if (!candidates.includes(p)) candidates.push(p);
+            } else {
+                for (const ext of this.supportedExtensions) {
+                    const p = `${this.schemsDir}${base}${ext}`;
+                    if (!candidates.includes(p)) candidates.push(p);
+                }
+            }
+        }
+
+        for (const fullPath of candidates) {
+            try {
+                const res = await this._fetch(fullPath, 2);
+                if (!res || !res.ok) continue;                    // 404 → candidat suivant
+                const buffer = await res.arrayBuffer();
+                const schem = this._parseBuffer(buffer, fullPath);
+                if (!schem || !schem.blocks || !schem.blocks.length) continue;
+                // Enregistre SOUS LE NOM EXACT demandé pour que hasTemplate(name) matche.
+                const meta = this._normalizeMetadata(
+                    entry ? { type: entry.t || '', file: fullPath } : { file: fullPath },
+                    fullPath, schem
+                );
+                this.assetManager.registerTemplate(name, null, schem, meta);
+                this._uiAnnounce(name);
+                return true;
+            } catch (e) { /* essaie le candidat suivant */ }
+        }
+        return false;
+    }
+
+    /* ══════════════════ Réseau (sémaphore + cache) ══════════════════ */
+
+    /**
+     * fetch limité en parallélisme. Seule la partie réseau occupe un slot :
+     * le décodage, lui, reste sur le thread principal sans emboliser les
+     * autres téléchargements.
+     */
+    async _fetch(url, attempts = 2) {
+        await this._acquireSlot();
+        try {
+            return await this._fetchWithRetry(url, attempts);
+        } finally {
+            this._releaseSlot();
+        }
+    }
+
+    async _acquireSlot() {
+        if (this._active < this.concurrency) { this._active++; return; }
+        await new Promise(resolve => this._waiters.push(resolve));
+        this._active++;
+    }
+
+    _releaseSlot() {
+        this._active--;
+        const next = this._waiters.shift();
+        if (next) next();
+    }
+
+    /**
+     * fetch robuste : distingue un vrai 404 (fichier absent) d'un échec
+     * TRANSITOIRE (erreur réseau, 429, 5xx) que l'on réessaie avec un petit
+     * backoff. Un 404 est renvoyé tel quel (pas de retry, c'est définitif).
+     * Renvoie la Response, ou null si toutes les tentatives réseau ont échoué.
+     */
+    async _fetchWithRetry(url, attempts = 2) {
+        let lastRes = null;
+        const opts = this.useCache ? { cache: 'default' } : { cache: 'no-store' };
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const res = await fetch(url, opts);
+                if (res.status === 404) return res;              // absence confirmée
+                if (res.ok) return res;                           // succès
+                lastRes = res;                                    // 5xx/429 → retry
+            } catch (e) {
+                lastRes = null;                                   // erreur réseau → retry
+            }
+            if (i < attempts - 1) await new Promise(r => setTimeout(r, 120 * (i + 1)));
+        }
+        return lastRes;
+    }
+
+    async _loadSchematic(path) {
+        const fullPath = path.startsWith(this.schemsDir) ? path : this.schemsDir + path;
+        const res = await this._fetchWithRetry(fullPath);
+        if (!res || !res.ok) throw new Error(res ? `${res.status}` : 'network');
+        const buffer = await res.arrayBuffer();
+        return this._parseBuffer(buffer, path);
+    }
+
+    /* ══════════════════ Décodage & métadonnées ══════════════════ */
+
+    _parseBuffer(buffer, path) {
+        const lower = String(path).toLowerCase();
+        let schem;
+        if (lower.endsWith('.bloxdschem')) {
+            if (!window.BloxdIO) throw new Error('BloxdIO not loaded');
+            // Une seule passe, sans Map intermédiaire ni liste temporaire :
+            // ~20× moins de travail que parseSchem + conversion.
+            schem = window.BloxdIO.parseSchemToBlockList
+                ? window.BloxdIO.parseSchemToBlockList(buffer)
+                : this._convertBloxdSchemToBlockList(window.BloxdIO.parseSchem(buffer));
+        } else {
+            schem = window.parseSchem(new TextDecoder().decode(buffer));
+        }
+        // 🧹 Retire automatiquement les socles (couches pleines) sous les assets.
+        return this._stripBottomPlatforms(schem);
+    }
+
+    // Convertit le format BloxdIO (Map<chunkKey, Int32Array>) en liste de blocs
+    // [{x,y,z,id}, ...] attendue par createMeshFromSchem / l'export. No-op si déjà une liste.
+    _convertBloxdSchemToBlockList(parsed) {
+        if (!parsed || !parsed.blocks) return parsed;
+        if (Array.isArray(parsed.blocks)) return parsed;             // déjà liste (JSON)
+        if (typeof parsed.blocks.forEach !== 'function') return parsed;
+        const CHUNK = 32;
+        const out = [];
+        parsed.blocks.forEach((arr, key) => {
+            if (!arr) return;
+            const p = key.split(',');
+            const bX = (+p[0]) * CHUNK, bY = (+p[1]) * CHUNK, bZ = (+p[2]) * CHUNK;
+            for (let lx = 0; lx < CHUNK; lx++)
+                for (let ly = 0; ly < CHUNK; ly++)
+                    for (let lz = 0; lz < CHUNK; lz++) {
+                        const id = arr[lx * 1024 + ly * 32 + lz];
+                        if (id !== 0) out.push({ x: bX + lx, y: bY + ly, z: bZ + lz, id });
+                    }
+        });
+        return Object.assign({}, parsed, { blocks: out });
+    }
+
+    _nameFromPath(path) {
+        return path.split('/').pop().replace(/\.(bloxdschem|json|schem)$/i, '').replace(/[_-]+/g, ' ').trim() || 'Schematic';
+    }
+
+    _makeUniqueTemplateName(baseName) {
+        const has = this.assetManager.hasEntry || this.assetManager.hasTemplate;
+        let name = baseName, i = 2;
+        while (has.call(this.assetManager, name)) name = `${baseName} ${i++}`;
+        return name;
+    }
+
+    _isSupported(path) {
+        const lower = String(path).toLowerCase();
+        return this.supportedExtensions.some(ext => lower.endsWith(ext));
+    }
+
     _normalizeMetadata(entry, sourcePath, schem) {
-        const asArray = v => !v ? [] : (Array.isArray(v) ? v.map(String) : [String(v)]);
+        const asArray = v => !v ? [] : (Array.isArray(v) ? v.map(String) : String(v).split(/\s+/).filter(Boolean));
         const type = asArray(entry.type || entry.types);
         const size = (schem && schem.size) ? { x: schem.size.x | 0, y: schem.size.y | 0, z: schem.size.z | 0 } : { x: 0, y: 0, z: 0 };
         const blockCount = (schem && schem.totalBlocks) ? schem.totalBlocks | 0 : 0;
@@ -227,57 +437,32 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         };
     }
 
-    _isSupported(path) {
-        const lower = String(path).toLowerCase();
-        return this.supportedExtensions.some(ext => lower.endsWith(ext));
+    /* ══════════════════ Rafraîchissement de l'interface ══════════════════ */
+
+    /** Accumule les noms à afficher puis rafraîchit au plus 1× par tick. */
+    _uiAnnounce(name) {
+        if (!this.libraryUI) return;
+        if (typeof this.libraryUI.invalidateNames === 'function') this.libraryUI.invalidateNames();
+        if (!this._uiPending) this._uiPending = new Set();
+        this._uiPending.add(name);
+        if (this._uiTimer) return;
+        this._uiTimer = setTimeout(() => { this._uiTimer = 0; this._flushUi(); }, 120);
     }
 
-    async _loadSchematic(path) {
-        const fullPath = path.startsWith(this.schemsDir) ? path : this.schemsDir + path;
-        const res = await this._fetchWithRetry(fullPath);
-        if (!res || !res.ok) throw new Error(res ? `${res.status}` : 'network');
-        const buffer = await res.arrayBuffer();
-        return this._parseBuffer(buffer, path);
+    _flushUi(now = false) {
+        if (this._uiTimer) { clearTimeout(this._uiTimer); this._uiTimer = 0; }
+        if (!this.libraryUI) { this._uiPending = null; return; }
+        const names = this._uiPending;
+        this._uiPending = null;
+        if (names && names.size && !now && typeof this.libraryUI.appendAssets === 'function') {
+            this.libraryUI.appendAssets(Array.from(names));
+        } else if (typeof this.libraryUI.populateLibrary === 'function') {
+            this.libraryUI.populateLibrary();
+        }
     }
 
     /**
-     * fetch robuste : distingue un vrai 404 (fichier absent) d'un échec
-     * TRANSITOIRE (erreur réseau, 429, 5xx) que l'on réessaie avec un petit
-     * backoff. Un 404 est renvoyé tel quel (pas de retry, c'est définitif).
-     * Renvoie la Response, ou null si toutes les tentatives réseau ont échoué.
-     */
-    async _fetchWithRetry(url, attempts = 2) {
-        let lastRes = null;
-        for (let i = 0; i < attempts; i++) {
-            try {
-                const res = await fetch(url, { cache: 'no-store' });
-                if (res.status === 404) return res;              // absence confirmée
-                if (res.ok) return res;                          // succès
-                lastRes = res;                                   // 5xx/429 → retry
-            } catch (e) {
-                lastRes = null;                                  // erreur réseau → retry
-            }
-            // Petit backoff avant de réessayer (sauf après la dernière tentative)
-            if (i < attempts - 1) await new Promise(r => setTimeout(r, 120 * (i + 1)));
-        }
-        return lastRes;
-    }
-
-    _parseBuffer(buffer, path) {
-        const lower = String(path).toLowerCase();
-        let schem;
-        if (lower.endsWith('.bloxdschem')) {
-            if (!window.BloxdIO) throw new Error('BloxdIO not loaded');
-            schem = this._convertBloxdSchemToBlockList(window.BloxdIO.parseSchem(buffer));
-        } else {
-            schem = window.parseSchem(new TextDecoder().decode(buffer));
-        }
-        // 🧹 Retire automatiquement les socles (couches pleines) sous les assets.
-        return this._stripBottomPlatforms(schem);
-    }
-
-    /**
-     * Détecte et retire les "sols" / gros cubes sous les assets.
+     * 🧹 Retire automatiquement les "sols" / gros cubes sous les assets.
      * Une couche est un socle si elle est quasi-pleine (≥ FILL de sa propre
      * bbox XZ) ET couvre ≥ FOOT de l'empreinte globale de l'asset.
      * On retire les couches consécutives depuis le bas, puis on décale le
@@ -373,96 +558,10 @@ window.SchematicLibraryLoader = class SchematicLibraryLoader {
         schem.size = { x: mxx - mnx + 1, y: mxy - mny + 1, z: mxz - mnz + 1 };
         schem.totalBlocks = count;
         if (schem.aabb) schem.aabb = { minX: 0, minY: 0, minZ: 0, maxX: mxx - mnx, maxY: mxy - mny, maxZ: mxz - mnz };
-        console.log(`🧹 ${schem.name || 'schem'}: ${shift} couche(s)-socle retirée(s) du bas (${count} blocs restants)`);
         return schem;
     }
 
-    // Convertit le format BloxdIO (Map<chunkKey, Int32Array>) en liste de blocs
-    // [{x,y,z,id}, ...] attendue par createMeshFromSchem / l'export. No-op si déjà une liste.
-    _convertBloxdSchemToBlockList(parsed) {
-        if (!parsed || !parsed.blocks) return parsed;
-        if (Array.isArray(parsed.blocks)) return parsed;             // déjà liste (JSON)
-        if (typeof parsed.blocks.forEach !== 'function') return parsed;
-        const CHUNK = 32;
-        const out = [];
-        parsed.blocks.forEach((arr, key) => {
-            if (!arr) return;
-            const p = key.split(',');
-            const bX = (+p[0]) * CHUNK, bY = (+p[1]) * CHUNK, bZ = (+p[2]) * CHUNK;
-            for (let lx = 0; lx < CHUNK; lx++)
-                for (let ly = 0; ly < CHUNK; ly++)
-                    for (let lz = 0; lz < CHUNK; lz++) {
-                        const id = arr[lx * 1024 + ly * 32 + lz];
-                        if (id !== 0) out.push({ x: bX + lx, y: bY + ly, z: bZ + lz, id });
-                    }
-        });
-        return Object.assign({}, parsed, { blocks: out });
-    }
-
-    _nameFromPath(path) {
-        return path.split('/').pop().replace(/\.(bloxdschem|json|schem)$/i, '').replace(/[_-]+/g, ' ').trim() || 'Schematic';
-    }
-
-    _makeUniqueTemplateName(baseName) {
-        let name = baseName, i = 2;
-        while (this.assetManager.hasTemplate(name)) name = `${baseName} ${i++}`;
-        return name;
-    }
-
     _yieldToBrowser() { return new Promise(r => setTimeout(r, 0)); }
-
-    /**
-     * Charge à la demande UN template précis par son nom (ex: "house087"),
-     * en tentant de récupérer directement schems/<name>.bloxdschem.
-     * Sert de filet de sécurité à la restauration de session : si un asset
-     * sauvegardé n'a pas été chargé par le balayage de manifest (hoquet réseau,
-     * arrêt anticipé…), on va chercher son fichier exact. Renvoie true si le
-     * template est disponible après l'appel.
-     *
-     * Gère aussi les noms *dé-doublonnés* par _makeUniqueTemplateName() : quand
-     * deux entrées du manifest produisent le même nom de base, la seconde est
-     * enregistrée « <base> 2 », « <base> 3 »… Or la session sauvegarde ce nom
-     * suffixé, alors qu'aucun fichier « <base> 2.bloxdschem » n'existe sur le
-     * disque. On retombe donc sur le fichier de base, tout en enregistrant le
-     * template sous le nom suffixé exact attendu par la sauvegarde.
-     */
-    async ensureTemplateLoaded(name) {
-        if (!name) return false;
-        if (this.assetManager.hasTemplate(name)) return true;
-
-        // Noms de fichiers à tenter, dans l'ordre de préférence :
-        //  1. le nom exact (couvre un vrai fichier nommé « maison 2.bloxdschem ») ;
-        //  2. le nom sans suffixe de dé-doublonnage « <base> N » ajouté au chargement.
-        const baseNames = [name];
-        const dedup = /^(.*\S)\s+(\d+)$/.exec(name);
-        if (dedup) baseNames.push(dedup[1]);
-
-        // Candidats de chemins : nom tel quel + variantes d'extension supportées.
-        const candidates = [];
-        for (const base of baseNames) {
-            if (/\.(bloxdschem|json|schem)$/i.test(base)) {
-                candidates.push(`${this.schemsDir}${base}`);
-            } else {
-                for (const ext of this.supportedExtensions) candidates.push(`${this.schemsDir}${base}${ext}`);
-            }
-        }
-
-        for (const fullPath of candidates) {
-            try {
-                const res = await this._fetchWithRetry(fullPath, 3);
-                if (!res || !res.ok) continue;               // 404 → essaie l'extension suivante
-                const buffer = await res.arrayBuffer();
-                const schem = this._parseBuffer(buffer, fullPath);
-                if (!schem || !schem.blocks || !schem.blocks.length) continue;
-                // Enregistre SOUS LE NOM EXACT demandé pour que hasTemplate(name) matche.
-                const meta = this._normalizeMetadata({ file: fullPath }, fullPath, schem);
-                this.assetManager.registerTemplate(name, null, schem, meta);
-                if (this.libraryUI) this.libraryUI.populateLibrary();
-                return true;
-            } catch (e) { /* essaie le candidat suivant */ }
-        }
-        return false;
-    }
 };
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -483,6 +582,10 @@ window.LibraryUI = class LibraryUI {
         this.terrainManager = terrainManager;
         this.selectedTagKeys = new Set();   // catégories sélectionnées (tree/rock/house/stand)
         this.tagSearchTerm = '';
+        this._namesCache = null;             // tri des noms d'assets (mutualisé)
+        this._namesDirty = true;
+        this._shownNames = null;             // cartes actuellement affichées
+        this._tagFilterSig = null;           // puces de catégories : on ne les recrée que si besoin
         // Filtres de taille (null = pas de filtre)
         this.maxBlocks = null;
         this.maxW = null; this.maxH = null; this.maxD = null;
@@ -611,9 +714,15 @@ window.LibraryUI = class LibraryUI {
 
         // Recherche par nom
         const tagSearch = document.getElementById('asset-tag-search');
+        // Le filtrage reconstruit la liste : on attend la fin de la frappe
+        // (sinon une carte recréée par lettre saisie).
         tagSearch.addEventListener('input', () => {
-            this.tagSearchTerm = tagSearch.value.trim().toLowerCase();
-            this.populateLibrary();
+            if (this._searchTimer) clearTimeout(this._searchTimer);
+            this._searchTimer = setTimeout(() => {
+                this._searchTimer = 0;
+                this.tagSearchTerm = tagSearch.value.trim().toLowerCase();
+                this.populateLibrary();
+            }, 140);
         });
 
         // Filtres de taille
@@ -625,7 +734,8 @@ window.LibraryUI = class LibraryUI {
         const onSize = () => {
             this.maxBlocks = numVal(smb);
             this.maxW = numVal(sw); this.maxH = numVal(sh); this.maxD = numVal(sd);
-            this.populateLibrary();
+            if (this._sizeTimer) clearTimeout(this._sizeTimer);
+            this._sizeTimer = setTimeout(() => { this._sizeTimer = 0; this.populateLibrary(); }, 140);
         };
         [smb, sw, sh, sd].forEach(el => el && el.addEventListener('input', onSize));
 
@@ -735,7 +845,7 @@ window.LibraryUI = class LibraryUI {
     }
     _collectAllCategories() {
         const set = new Set();
-        for (const name in this.assetManager.templateSchem) {
+        for (const name of this._allNames()) {
             const c = this._getAssetCategory(name);
             if (c) set.add(c);
         }
@@ -745,10 +855,33 @@ window.LibraryUI = class LibraryUI {
             return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
         });
     }
+
+    /**
+     * Tous les noms d'assets connus, index (squelette) compris. Tri mutualisé :
+     * `populateLibrary()` était appelé une fois par lot de 10 téléchargements
+     * et refaisait le tri complet de ~900 noms à chaque fois.
+     */
+    _allNames() {
+        if (this._namesCache && !this._namesDirty) return this._namesCache;
+        this._namesCache = this.assetManager.getTemplateNames
+            ? this.assetManager.getTemplateNames().slice()
+            : Object.keys(this.assetManager.templateSchem).sort();
+        this._namesDirty = false;
+        return this._namesCache;
+    }
+
+    /** Un asset de plus dans la bibliothèque : le tri est à refaire. */
+    invalidateNames() { this._namesDirty = true; }
+
     _renderTagFilters() {
         const list = document.getElementById('asset-tag-filter-list');
         if (!list) return;
         const cats = this._collectAllCategories();
+        const sig = cats.join('|');
+        // Les catégories ne changent quasiment jamais : on ne recrée pas les
+        // puces (et leurs écouteurs) à chaque rafraîchissement de la liste.
+        if (sig === this._tagFilterSig && list.childElementCount) return;
+        this._tagFilterSig = sig;
         list.innerHTML = '';
         cats.forEach(cat => {
             const chip = document.createElement('button');
@@ -785,40 +918,160 @@ window.LibraryUI = class LibraryUI {
 
     populateLibrary() {
         this._renderTagFilters();
-        const grid = document.getElementById('asset-grid-sidebar');
+        const grid = this._grid();
         if (!grid) return;
-        const names = Object.keys(this.assetManager.templateSchem).sort();
+        this._ensureGridDelegation(grid);
+        const names = this._allNames();
         const filtered = names.filter(n => this._assetMatchesFilters(n));
-        grid.innerHTML = '';
+        this._shownNames = new Set(filtered);
 
-        if (!filtered.length) {
-            const empty = document.createElement('div');
-            empty.className = 'asset-grid-empty';
-            empty.textContent = window.I18N.t('noAssets');
-            grid.appendChild(empty);
-        } else {
-            for (const name of filtered) {
-                const meta = this.assetManager.getTemplateMeta(name) || {};
-                const cat = this._getAssetCategory(name);
-                const bc = meta.blockCount || 0;
-                const sz = meta.size || { x: 0, y: 0, z: 0 };
-                const card = document.createElement('div');
-                card.className = 'asset-card-small cat-' + cat;
-                card.innerHTML =
-                    `<div class="asset-icon">${this._categoryIcon(cat)}</div>` +
-                    `<div class="asset-name">${name}</div>` +
-                    `<div class="asset-size">${bc} · ${sz.x}×${sz.y}×${sz.z}</div>`;
-                card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
-                card.addEventListener('click', () => {
-                    const schemData = this.assetManager.getTemplateSchem(name) || { size: { x: 4, y: 4, z: 4 }, blocks: [] };
-                    this.dragDropManager.startPlacement(name, schemData);
-                });
-                grid.appendChild(card);
-            }
-        }
+        // Une seule écriture du DOM (DocumentFragment) : insérer ~900 cartes
+        // une par une provoquait ~900 reflows sur la barre latérale.
+        const frag = document.createDocumentFragment();
+        for (const name of filtered) frag.appendChild(this._buildCard(name));
+        grid.replaceChildren(frag);
 
         const cnt = document.getElementById('asset-filter-count');
-        if (cnt) cnt.textContent = `${filtered.length} / ${names.length} ${window.I18N.t('assetsShort')}`;
+        if (cnt) cnt.textContent = filtered.length
+            ? `${filtered.length} / ${names.length} ${window.I18N.t('assetsShort')}`
+            : window.I18N.t('noAssets');
+    }
+
+    _grid() {
+        if (!this._gridEl || !document.body.contains(this._gridEl)) {
+            this._gridEl = document.getElementById('asset-grid-sidebar');
+        }
+        return this._gridEl;
+    }
+
+    _buildCard(name) {
+        const meta = this.assetManager.getTemplateMeta(name) || {};
+        const cat = this._getAssetCategory(name);
+        const bc = meta.blockCount || 0;
+        const sz = meta.size || { x: 0, y: 0, z: 0 };
+        const card = document.createElement('div');
+        card.className = 'asset-card-small cat-' + cat + (meta.pending ? ' is-pending' : '');
+        card.dataset.asset = name;
+        const sizeTxt = `${bc.toLocaleString('fr-FR')} · ${sz.x}×${sz.y}×${sz.z}`;
+        card.innerHTML =
+            `<div class="asset-icon">${this._categoryIcon(cat)}</div>` +
+            `<div class="asset-name"></div>` +
+            `<div class="asset-size"></div>`;
+        card.querySelector('.asset-name').textContent = name;
+        card.querySelector('.asset-size').textContent = sizeTxt;
+        card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
+        return card;
+    }
+
+    /**
+     * Ajout incrémental (balayage de repli) : une carte par nouveau nom, au
+     * lieu de reconstruire les ~900 déjà visibles à chaque lot reçu.
+     */
+    appendAssets(names) {
+        const grid = this._grid();
+        if (!grid || !names || !names.length) return;
+        this._ensureGridDelegation(grid);
+        this._allNames();                       // (re)charge le cache de noms si périmé
+        const frag = document.createDocumentFragment();
+        let added = 0;
+        for (const name of names) {
+            if (!this._assetMatchesFilters(name)) continue;
+            if (this._shownNames && this._shownNames.has(name)) {
+                // Déjà affichée (entrée squelette) : on remet à jour la taille
+                // affichée, qui vient d'être corrigée par le décodage réel.
+                this.refreshCard(name);
+                continue;
+            }
+            frag.appendChild(this._buildCard(name));
+            (this._shownNames || (this._shownNames = new Set())).add(name);
+            added++;
+        }
+        if (added) {
+            const empty = grid.querySelector('.asset-grid-empty');
+            if (empty) empty.remove();
+            grid.appendChild(frag);
+        }
+        const cnt = document.getElementById('asset-filter-count');
+        if (cnt) {
+            const total = this._allNames().length;
+            const shown = grid.querySelectorAll('.asset-card-small').length;
+            cnt.textContent = `${shown} / ${total} ${window.I18N.t('assetsShort')}`;
+        }
+    }
+
+    /** Met une carte à jour après décodage réel de son asset (fin de « pending »). */
+    refreshCard(name) {
+        const grid = this._grid();
+        if (!grid) return;
+        const card = grid.querySelector(`.asset-card-small[data-asset=\"${(window.CSS && CSS.escape) ? CSS.escape(name) : name}\"]`);
+        if (!card) return;
+        const meta = this.assetManager.getTemplateMeta(name) || {};
+        const bc = meta.blockCount || 0;
+        const sz = meta.size || { x: 0, y: 0, z: 0 };
+        card.classList.toggle('is-pending', !!meta.pending);
+        const sizeEl = card.querySelector('.asset-size');
+        if (sizeEl) sizeEl.textContent = `${bc.toLocaleString('fr-FR')} · ${sz.x}×${sz.y}×${sz.z}`;
+        card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
+    }
+
+    /**
+     * Évènement unique sur la grille (délégation) : 922 écouteurs posés un à un
+     * sur chaque carte coûtent cher à la construction et à la destruction.
+     */
+    _ensureGridDelegation(grid) {
+        if (grid._bloxdDelegated) return;
+        grid._bloxdDelegated = true;
+        const cardOf = (e) => e.target.closest ? e.target.closest('.asset-card-small') : null;
+        grid.addEventListener('click', (e) => {
+            const card = cardOf(e);
+            if (card && card.dataset.asset) this._activateAsset(card.dataset.asset, card);
+        });
+        // Survol = préchargement : au clic, l'asset est déjà décodé.
+        grid.addEventListener('pointerover', (e) => {
+            const card = cardOf(e);
+            if (!card || !card.dataset.asset) return;
+            if (card.dataset.prefetched) return;
+            card.dataset.prefetched = '1';
+            const loader = window.appSchematicLibraryLoader;
+            if (loader && typeof loader.prefetch === 'function') loader.prefetch(card.dataset.asset);
+        }, { passive: true });
+    }
+
+    /**
+     * Clic sur une carte : pose l'asset. Si ses blocs ne sont pas encore
+     * téléchargés (mode index), on les charge à la volée — l'attente se
+     * compte en dizaines de millisecondes pour un fichier, plus en minutes.
+     */
+    async _activateAsset(name, card) {
+        const ready = this.assetManager.hasTemplateData
+            ? this.assetManager.hasTemplateData(name)
+            : this.assetManager.hasTemplate(name);
+        if (ready) {
+            const schemData = this.assetManager.getTemplateSchem(name);
+            if (schemData) { this.dragDropManager.startPlacement(name, schemData); return; }
+        }
+        const loader = window.appSchematicLibraryLoader;
+        if (!loader || typeof loader.ensureTemplateLoaded !== 'function') {
+            const schemData = this.assetManager.getTemplateSchem(name) || { size: { x: 4, y: 4, z: 4 }, blocks: [] };
+            this.dragDropManager.startPlacement(name, schemData);
+            return;
+        }
+        if (card) card.classList.add('is-loading');
+        const t = (window.I18N && window.I18N.t) ? window.I18N.t('loadingAsset') : '';
+        const msg = (t && t !== 'loadingAsset') ? t.split('{n}').join(name) : `${name}…`;
+        if (window.SceneManager && window.SceneManager.toast) window.SceneManager.toast(msg, 'info');
+        let ok = false;
+        try { ok = await loader.ensureTemplateLoaded(name); } catch (e) { ok = false; }
+        if (card) card.classList.remove('is-loading');
+        if (!ok) {
+            const err = (window.I18N && window.I18N.t) ? window.I18N.t('assetLoadError') : '';
+            if (window.SceneManager && window.SceneManager.toast) {
+                window.SceneManager.toast(err && err !== 'assetLoadError' ? err : 'Asset introuvable', 'error');
+            }
+            return;
+        }
+        const schemData = this.assetManager.getTemplateSchem(name);
+        if (schemData) this.dragDropManager.startPlacement(name, schemData);
     }
 };
 
@@ -2094,9 +2347,13 @@ window.SceneManager = class SceneManager {
                 const loader = window.appSchematicLibraryLoader;
                 if (loader && typeof loader.ensureTemplateLoaded === 'function') {
                     const uniqueNames = [...new Set(res.pending.map(p => p.name))];
-                    for (const nm of uniqueNames) {
-                        try { await loader.ensureTemplateLoaded(nm); } catch (e) {}
-                    }
+                    // En parallèle (limité par le sémaphore du chargeur) : ces
+                    // assets-là sont tous nécessaires, les attendre l'un après
+                    // l'autre coûtait N × aller-retour réseau.
+                    try {
+                        if (typeof loader.ensureTemplatesLoaded === 'function') await loader.ensureTemplatesLoaded(uniqueNames);
+                        else for (const nm of uniqueNames) await loader.ensureTemplateLoaded(nm);
+                    } catch (e) {}
                     const res3 = this._tryPlace(res.pending);
                     res.count += res3.count;
                     res.pending = res3.pending;
@@ -2269,12 +2526,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // Clavier piloté par le hub (clé partagée bloxdTools.keyboard)
     try { window.I18N.keyboard = localStorage.getItem('bloxdTools.keyboard') || 'azerty'; } catch(e) {}
 
-    // Couleurs fidèles des blocs : on initialise la palette BlockColors avec la
-    // table nom→id (→ chaque bloc retrouve sa vraie couleur, eau comprise).
-    if (window.BlockColors && typeof window.BlockColors.initFromNameMap === 'function') {
+    // Palette unifiée (block_colors.js — BloxdBlockColors)
+    if (typeof BloxdBlockColors !== 'undefined') {
         fetch('nameToId.json', { cache: 'force-cache' })
             .then(r => r.ok ? r.json() : null)
-            .then(map => { if (map) window.BlockColors.initFromNameMap(map); })
+            .then(map => { if (map) BloxdBlockColors.init(map); })
             .catch(() => {});
     }
 
@@ -2372,7 +2628,18 @@ window.addEventListener('DOMContentLoaded', () => {
             };
 
             window.appSchematicLoadDone
-                .then((count) => { if (count > 0) libraryUI.populateLibrary(); })
+                .then((count) => {
+                    if (count > 0) {
+                        libraryUI.invalidateNames();
+                        libraryUI.populateLibrary();
+                        // En mode index, les fichiers ne sont PAS encore téléchargés :
+                        // on l'explique une fois, pour que la liste ne paraisse pas « vide ».
+                        if (!loader.usedFallbackScan && window.SceneManager && window.SceneManager.toast) {
+                            const txt = window.I18N.t('libraryReady');
+                            if (txt && txt !== 'libraryReady') window.SceneManager.toast(txt.split('{n}').join(count), 'info');
+                        }
+                    }
+                })
                 .catch((err) => {
                     // Le chargeur a échoué globalement : on log et on continue quand même.
                     // Le filet de sécurité ensureTemplateLoaded() de restore() pourra

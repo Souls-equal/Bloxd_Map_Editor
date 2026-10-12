@@ -6,6 +6,12 @@
     <title>Bloxd Tools — Schem Placer v4.3.0</title>
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAOVBMVEVHcEwAAAA9pNs4m9EijslFreYwk8k2mc/S1tkrVrMohLU4jLrm5ubc3d7Z2dnMzMzo6OjW1tbr6+vyK7X2AAAAAXRSTlMAQObYZgAAAHZJREFUGNONz0sOwyAMBNDMjG0I+ff+h62hUaVWXdSCxTxsyUzTjwLwmSkOuh9AS0iCyOEyRQYzyhwDTPDYj2PZegvoHR5hUf0FyHOGVXezDnDPe3pdJHUorRXYVq913cdIm+cC0hVcYnRkzkHq3u+94PcP/q4nWJ8CdE2R79EAAAAASUVORK5CYII=">
     <link rel="stylesheet" href="schem_placer.css">
+    <!-- PERF : poignée de main DNS+TLS avec le CDN lancée pendant le CSS, et le
+         moteur 3D (~4 Mo) commence à télécharger tout de suite. -->
+    <link rel="preconnect" href="https://cdn.babylonjs.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.babylonjs.com">
+    <link rel="preload" as="script" href="https://cdn.babylonjs.com/babylon.js">
 </head>
 <body>
 <div id="app">
@@ -173,9 +179,11 @@
 </div>
 
 <!-- Scripts Babylon.js -->
-<script src="https://cdn.babylonjs.com/babylon.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script src="schem_placer.js"></script>
-<script src="welcome.js"></script>
+<script defer src="https://cdn.babylonjs.com/babylon.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="block_colors.js"></script>
+<script defer src="schem_placer.js"></script>
+<script defer src="welcome.js"></script>
+<script defer src="app-cache.js"></script>
 </body>
 </html>

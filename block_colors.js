@@ -153,7 +153,15 @@ function blockColorRGB(id){
     return [((h>>16)&255)/255,((h>>8)&255)/255,(h&255)/255];
 }
 
-const API = { init, hex: blockColorHex, rgb: blockColorRGB, WOOD: BC_WOOD, METAL: BC_METAL };
+function colorFromHex(hex){
+    return { r:((hex>>16)&255)/255, g:((hex>>8)&255)/255, b:(hex&255)/255 };
+}
+function nameForId(id){ return BC_ID_TO_NAME[id]||''; }
+
+const API = { init, hex: blockColorHex, rgb: blockColorRGB, colorFromHex, nameForId,
+              WOOD: BC_WOOD, METAL: BC_METAL,
+              /* aliases pour compatibilité avec l'ancien window.BlockColors */
+              initFromNameMap: init, getBlockColor: blockColorHex, _nameForId: nameForId };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 global.BloxdBlockColors = API;
 

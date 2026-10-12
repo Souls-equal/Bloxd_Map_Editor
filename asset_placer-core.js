@@ -78,6 +78,9 @@ window.I18N = {
             sceneImportError: "Import failed (invalid file)",
             autoRestored: "Restored {n} assets from last session",
             loading: "Loading… waiting for schems to finish",
+            loadingAsset: "Loading “{n}”…",
+            assetLoadError: "This asset could not be loaded (file missing?).",
+            libraryReady: "🗂️ {n} assets listed — each file is downloaded only when you place it.",
             exportModalTitle: "📤 Export schematic",
             exportModalDesc: "You get a .bloxdschem for Bloxd. If the scene is too big, it becomes a .zip of parts — load each part in game at the same Y. The session .json is a different button, and Bloxd cannot load it.",
             exportFilenameLabel: "File name (if single schem)",
@@ -157,6 +160,9 @@ window.I18N = {
             sceneImportError: "Échec de l'import (fichier invalide)",
             autoRestored: "{n} asset(s) restauré(s) depuis la dernière session",
             loading: "Chargement… attente des schems",
+            loadingAsset: "Chargement de « {n} »…",
+            assetLoadError: "Cet asset n’a pas pu être chargé (fichier manquant ?).",
+            libraryReady: "🗂️ {n} assets affichés — un fichier n’est téléchargé qu’au placement.",
             exportModalTitle: "📤 Export du schematic",
             exportModalDesc: "Tu obtiens un .bloxdschem pour Bloxd. Si la scène est trop grande, c'est un .zip de parties — charge chaque partie en jeu au même Y. Le .json de session est un autre bouton, Bloxd ne le charge pas.",
             exportFilenameLabel: "Nom du fichier (si un seul schem)",
@@ -205,7 +211,7 @@ window.I18N = {
             confirmClearAll:"すべてのアセットを削除しますか？",
             confirmDeleteSave:"このブラウザの保存データを削除しますか？",
             sceneCleared:"すべて削除しました",saveDeleted:"保存データを削除しました",
-            sceneImportError:"取込失敗 (無効なファイル)",autoRestored:"前回のセッションから {n} 件復元",loading:"読み込み中… schem待機"
+            sceneImportError:"取込失敗 (無効なファイル)",autoRestored:"前回のセッションから {n} 件復元",loading:"読み込み中… schem待機",loadingAsset:"「{n}」を読み込み中…",assetLoadError:"このアセットを読み込めませんでした（ファイルがない？）。",libraryReady:"🗂️ {n} 件を表示中 — ファイルは配置時にのみダウンロードされます。"
         },
         ko: {
             library:"📚 에셋 라이브러리",importTerrain:"🌄 지형 (.bloxdschem)",
@@ -237,7 +243,7 @@ window.I18N = {
             confirmClearAll:"모든 배치된 에셋을 삭제할까요?",
             confirmDeleteSave:"이 브라우저의 저장 데이터를 삭제할까요?",
             sceneCleared:"모든 에셋 삭제됨",saveDeleted:"저장 데이터 삭제됨",
-            sceneImportError:"가져오기 실패 (잘못된 파일)",autoRestored:"이전 세션에서 {n}개 복원",loading:"로딩 중… schem 대기"
+            sceneImportError:"가져오기 실패 (잘못된 파일)",autoRestored:"이전 세션에서 {n}개 복원",loading:"로딩 중… schem 대기",loadingAsset:"{n} 불러오는 중…",assetLoadError:"에셋을 불러오지 못했습니다 (파일이 없음?).",libraryReady:"🗂️ {n}개 표시 중 — 파일은 배치할 때만 다운로드됩니다."
         },
         th: {
             library:"📚 ไลบรารีอุปกรณ์",importTerrain:"🌄 ภูมิประเทศ (.bloxdschem)",
@@ -269,7 +275,7 @@ window.I18N = {
             confirmClearAll:"ลบอุปกรณ์ทั้งหมด?",
             confirmDeleteSave:"ลบข้อมูลที่บันทึกจากเบราว์เซอร์นี้?",
             sceneCleared:"ลบอุปกรณ์ทั้งหมดแล้ว",saveDeleted:"ลบข้อมูลที่บันทึกแล้ว",
-            sceneImportError:"นำเข้าล้มเหลว (ไฟล์ไม่ถูกต้อง)",autoRestored:"กู้คืน {n} รายการจากเซสชันก่อนหน้า",loading:"กำลังโหลด… รอ schem"
+            sceneImportError:"นำเข้าล้มเหลว (ไฟล์ไม่ถูกต้อง)",autoRestored:"กู้คืน {n} รายการจากเซสชันก่อนหน้า",loading:"กำลังโหลด… รอ schem",loadingAsset:"กำลังโหลด “{n}”…",assetLoadError:"โหลดเอ็ทนี้ไม่สำเร็จ (ไฟล์หายไป?)",libraryReady:"🗂️ แสดง {n} ชิ้น — ดาวน์โหลดเฉพาะตอนวางเท่านั้น"
         }
     },
 
@@ -519,6 +525,107 @@ window.I18N = {
         };
     }
 
+    /**
+     * parseSchemToBlockList — PARSEUR RAPIDE EN UNE SEULE PASSE.
+     *
+     * parseSchem() ci-dessus est générique (il reconstruit un Map<chunkKey,
+     * Int32Array(32768)>, puis le normalise, puis le code appelant le
+     * re-transforme en liste de blocs). Coût réel : 4 boucles complètes de
+     * 32 768 cases PAR CHUNK, plus 128 Ko d'allocation par chunk — même pour
+     * un chunk quasiment vide. Sur une carte de quelques centaines de chunks
+     * c'est ce qui fait figer l'onglet plusieurs secondes sur un portable.
+     *
+     * Ici on déroule directement le RLE : une run d'air est sautée en une
+     * addition (aucune écriture), une run pleine émet ses blocs dans l'ordre.
+     * Le travail devient proportionnel au NOMBRE DE BLOCS et non plus au
+     * nombre de chunks × 32768, et il n'y a plus d'allocation intermédiaire.
+     *
+     * Retourne exactement ce que consument les appelants de
+     * « parseSchem + _convertBloxdSchemToBlockList » : { blocks: [{x,y,z,id}],
+     * totalBlocks, size, aabb, ... } avec des blocs déjà recentrés sur (0,0,0).
+     */
+    function parseSchemToBlockList(buffer) {
+        const buf = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        if (!buf || buf.length < 8) throw new Error("Fichier vide ou tronqué (pas un .bloxdschem).");
+        const off = { value: 0 };
+        for (let i = 0; i < 4; i++) {
+            if (buf[off.value++] !== 0) {
+                console.warn("BloxdSchem: header non nul à l'octet", i);
+                break;
+            }
+        }
+        const name = readAvroString(buf, off);
+        const px = readAvroInt(buf, off);
+        const py = readAvroInt(buf, off);
+        const pz = readAvroInt(buf, off);
+        const sx = readAvroInt(buf, off);
+        const sy = readAvroInt(buf, off);
+        const sz = readAvroInt(buf, off);
+
+        const blocks = [];
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        let nonEmptyChunks = 0;
+
+        while (off.value < buf.length) {
+            let blockCount = readAvroInt(buf, off);
+            if (blockCount === 0) break;
+            if (blockCount < 0) { blockCount = -blockCount; readAvroInt(buf, off); }
+            for (let c = 0; c < blockCount; c++) {
+                const cx = readAvroInt(buf, off);
+                const cy = readAvroInt(buf, off);
+                const cz = readAvroInt(buf, off);
+                const rle = readAvroBytes(buf, off);
+                const baseX = px + cx * CHUNK, baseY = py + cy * CHUNK, baseZ = pz + cz * CHUNK;
+                const rOff = { value: 0 };
+                let i = 0, lx = 0, ly = 0, lz = 0, emitted = 0;
+                while (i < CHUNK_VOL && rOff.value < rle.length) {
+                    const count = readUvarint(rle, rOff);
+                    const bid = readUvarint(rle, rOff);
+                    if (count <= 0) break;
+                    if (bid === AIR_ID) {
+                        // Run d'air : on avance les index sans rien écrire ni allouer.
+                        for (let k = 0; k < count && i < CHUNK_VOL; k++) {
+                            i++;
+                            if (++lz === CHUNK) { lz = 0; if (++ly === CHUNK) { ly = 0; lx++; } }
+                        }
+                        continue;
+                    }
+                    emitted += count;
+                    for (let k = 0; k < count && i < CHUNK_VOL; k++, i++) {
+                        const wx = baseX + lx, wy = baseY + ly, wz = baseZ + lz;
+                        blocks.push({ x: wx, y: wy, z: wz, id: bid });
+                        if (wx < minX) minX = wx; if (wx > maxX) maxX = wx;
+                        if (wy < minY) minY = wy; if (wy > maxY) maxY = wy;
+                        if (wz < minZ) minZ = wz; if (wz > maxZ) maxZ = wz;
+                        if (++lz === CHUNK) { lz = 0; if (++ly === CHUNK) { ly = 0; lx++; } }
+                    }
+                }
+                if (emitted > 0) nonEmptyChunks++;
+            }
+        }
+
+        if (!isFinite(minX)) { minX = px; minY = py; minZ = pz; maxX = px; maxY = py; maxZ = pz; }
+        // Recentrage sur l'origine (comme la normalisation de parseSchem).
+        if (minX !== 0 || minY !== 0 || minZ !== 0) {
+            for (let i = 0; i < blocks.length; i++) {
+                const b = blocks[i];
+                b.x -= minX; b.y -= minY; b.z -= minZ;
+            }
+        }
+        const sizeX = maxX - minX + 1, sizeY = maxY - minY + 1, sizeZ = maxZ - minZ + 1;
+        return {
+            name,
+            rawPos: { x: px, y: py, z: pz },
+            rawSize: { x: sx, y: sy, z: sz },
+            blocks,
+            nonEmptyChunks,
+            totalBlocks: blocks.length,
+            aabb: { minX: 0, minY: 0, minZ: 0, maxX: sizeX - 1, maxY: sizeY - 1, maxZ: sizeZ - 1 },
+            size: { x: sizeX, y: sizeY, z: sizeZ }
+        };
+    }
+
     function buildMergedSchem(instances, name = "Merged Schem") {
         let gMinX = Infinity, gMinY = Infinity, gMinZ = Infinity;
         let gMaxX = -Infinity, gMaxY = -Infinity, gMaxZ = -Infinity;
@@ -647,6 +754,7 @@ window.I18N = {
 
     global.BloxdIO = {
         parseSchem,
+        parseSchemToBlockList,
         buildMergedSchem,
         getBlockColor,
         CHUNK,
@@ -660,542 +768,17 @@ window.I18N = {
 /* ═══════════════════════════════════════════════════════════════ */
 
 /**
- * block_colors.js — Couleurs fidèles pour un très grand nombre de blocs Bloxd.io.
- *
- * Stratégie :
- *  - Une table de couleurs "de base" pour les couleurs nommées (white, orange, magenta, ...)
- *    déclinées par type de matériau (wool, concrete, planks, baked clay, glass, ceramic, tiles).
- *  - Des couleurs matériaux spécifiques (bois par essence, feuilles, minerais, etc.)
- *  - Une fonction getBlockColor(id) qui combine une table explicite de blocs connus
- *    et un fallback par analyse du nom (recherche de mots-clés) pour les blocs
- *    moins fréquents. Au pire on retombe sur une couleur de matière générique.
+ * window.BlockColors — anciennement une copie locale de la palette ;
+ * maintenant un pont vers BloxdBlockColors (block_colors.js).
+ * API conservée : initFromNameMap(map), getBlockColor(id) → hex, _nameForId(id).
  */
-
 (function (global) {
     'use strict';
-
-    // Couleurs de base par teinte (proches Minecraft/Bloxd)
-    const HUE = {
-        White:      0xf2f2f2,
-        Orange:     0xea7e35,
-        Magenta:    0xc74ebd,
-        'Light Blue':0x6387d2,
-        Yellow:     0xb8a93a,
-        Lime:       0x72b828,
-        Pink:       0xe88da2,
-        Gray:       0x6a6a6a,
-        'Light Gray':0xa0a0a0,
-        Cyan:       0x6099a8,
-        Purple:     0x804dba,
-        Blue:       0x3c54ad,
-        Brown:      0x7b5536,
-        Green:      0x4d8a33,
-        Red:        0xa03333,
-        Black:      0x1b1b20,
-        // Bonus
-        Maroon:     0x6b1e1e,
-        Teal:       0x2f7f87,
-        Indigo:     0x3b3b8c,
-        Gold:       0xf2c94c,
-        Bronze:     0xa57a3f,
-        Copper:     0xc47d4a,
-        Beige:      0xd9c99a,
-        Cream:      0xf1e9ca,
-        Silver:     0xccccd6,
-    };
-
-    // Légères variations par matériau (facteur multiplicatif)
-    const MATERIAL_ADJUST = {
-        wool:           [1.00, 1.00, 1.00],
-        concrete:       [0.88, 0.88, 0.88],  // plus sombre et plus mat
-        planks:         [0.82, 0.70, 0.50],  // mixé avec brun-bois
-        'baked clay':   [0.85, 0.78, 0.70],
-        clay:           [0.95, 0.95, 0.95],
-        glass:          [1.00, 1.00, 1.00],
-        ceramic:        [0.95, 0.95, 1.00],
-        tile:           [0.92, 0.92, 0.95],
-    };
-
-    // Couleurs par essence de bois (écorce et intérieur)
-    const WOOD = {
-        Maple:  { log: 0x8a6339, planks: 0xc19a6b, leaves: 0x5a9633, sapling: 0x5a9633, barkless: 0xc19a6b },
-        Pine:   { log: 0x55463a, planks: 0x8d7350, leaves: 0x2d5c2c, sapling: 0x3a7a3b, barkless: 0x8d7350 },
-        Plum:   { log: 0x6a4b36, planks: 0xa38264, leaves: 0x4d7e39, sapling: 0x558a3d, barkless: 0xa38264, fruit: 0x7a2a4b },
-        Cedar:  { log: 0x5c4835, planks: 0x8a6f4d, leaves: 0x2e6a2f, sapling: 0x3c7a3b, barkless: 0x8a6f4d },
-        Aspen:  { log: 0x9a8c76, planks: 0xd1c08b, leaves: 0x7bb34a, sapling: 0x7bb34a, barkless: 0xd1c08b },
-        Elm:    { log: 0x7a5a3c, planks: 0xa38054, leaves: 0x48893a, sapling: 0x48893a, barkless: 0xa38054 },
-        Cherry: { log: 0xb49070, planks: 0xe0baa6, leaves: 0x8e3a4f, sapling: 0x8e3a4f, barkless: 0xe0baa6 },
-        Palm:   { log: 0x786044, planks: 0x9d835b, leaves: 0x40893c, sapling: 0x40893c, barkless: 0x9d835b, coconut: 0x6b4a2c },
-        Pear:   { log: 0x765c42, planks: 0xa78765, leaves: 0x4e8d3d, sapling: 0x4e8d3d, barkless: 0xa78765, fruit: 0x9cb74a },
-    };
-
-    // Couleurs minerais / métaux / gemmes
-    const METAL = {
-        Stone:          0x808080,
-        'Smooth Stone': 0x9a9a9a,
-        Diorite:        0xdcdcdc,
-        Andesite:       0x86847f,
-        Granite:        0x9b7c71,
-        Sandstone:      0xddc98a,
-        Yellowstone:    0xc3b070,
-        Obsidian:       0x140d23,
-        Bedrock:        0x2f2f34,
-        Cobblestone:    0x757575,
-        Mossy:          0x6b7a54,
-        Cracked:        0x777777,
-        Bricks:         0x934b42,
-        'Stone Bricks': 0x7f7f79,
-        'Dark Red Brick': 0x602924,
-        'Dark Red Stone': 0x5a2222,
-        Coal:           0x262628,
-        Iron:           0xd4d4d4,
-        Gold:           0xf3d04a,
-        'Lapis Lazuli': 0x2a4fa0,
-        Emerald:        0x3dd06b,
-        Diamond:        0x63d8e8,
-        Quartz:         0xf4efe4,
-        Moonstone:      0x8ab8e0,
-        Magma:          0xff6a1f,
-        Water:          0x2a7bc0,
-        Ice:            0xa8d6ee,
-        Snow:           0xf5f9fc,
-        Glass:          0xcfe8f5,
-        Sponge:         0xd6b751,
-        Beacon:         0xd8f1ff,
-        Hay:            0xc8a841,
-        Cactus:         0x3f803a,
-        Grass:          0x5aa03a,
-        Dirt:           0x6e4b2a,
-        Sand:           0xe6d797,
-        Clay:           0xa2aaa8,
-        Gravel:         0x888888,
-        Chalk:          0xf8f8f0,
-        Lava:           0xff5522,
-        Redstone:       0xaa1c1c,
-    };
-
-    // Couleurs fleurs/plantes
-    const FLORA = {
-        Dandelion:    0xfde04c,
-        Poppy:        0xd83030,
-        Tulip:        0xe85a7a,
-        Daisy:        0xf2f2f2,
-        Bluebell:     0x4461d6,
-        Allium:       0x9c63c8,
-        'Azure Bluet':0xdbe6ff,
-        'Lily of the Valley': 0xffffff,
-        'Wither Rose':0x2a1a1a,
-        Roses:        0xc2282b,
-        Flower:       0xff76a6,
-        Sapling:      0x5e9d46,
-        Leaves:       0x3e8a3a,
-        Vines:        0x3c7c36,
-    };
-
-    // Couleur des fleurs/feuilles par la couleur du mot clé
-    const FLOWER_BY_COLOR = {
-        red: 0xd93c3c, orange: 0xe27d2e, yellow: 0xeacb3d, lime: 0x83c92c,
-        green: 0x3e9030, cyan: 0x3fb8b3, 'light blue': 0x5aaee0, blue: 0x3e5bc4,
-        purple: 0x8b4fc8, magenta: 0xc54fb6, pink: 0xea8ba6, white: 0xf5f5f5,
-        gray: 0x8a8a8a, 'light gray': 0xbfbfbf, black: 0x202028, brown: 0x8a5f3a
-    };
-
-    // Helpers couleur ----------------------------------------------------
-    function hexToRgb(h) {
-        return [(h >> 16) & 255, (h >> 8) & 255, h & 255];
-    }
-    function rgbToHex(r, g, b) {
-        return ((clamp(r) << 16) | (clamp(g) << 8) | clamp(b)) >>> 0;
-    }
-    function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
-    function multiply(h, f) {
-        const [r,g,b] = hexToRgb(h);
-        const [fr,fg,fb] = (typeof f === 'number') ? [f,f,f] : f;
-        return rgbToHex(r*fr, g*fg, b*fb);
-    }
-    function mix(h1, h2, t=0.5) {
-        const a = hexToRgb(h1), b = hexToRgb(h2);
-        return rgbToHex(a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t);
-    }
-
-    // Appliquer une teinte nommée à un matériau.
-    function colored(hueName, material) {
-        let base = HUE[hueName] !== undefined ? HUE[hueName] : 0x909090;
-        if (material) {
-            const adj = MATERIAL_ADJUST[material];
-            if (adj) {
-                // Pour les planches : teinter vers brun-bois
-                if (material === 'planks') base = mix(base, 0x7a5a3a, 0.55);
-                else if (material === 'baked clay') base = mix(base, 0x9b6f50, 0.35);
-                else base = multiply(base, adj);
-            }
-        }
-        return base;
-    }
-
-    // Table explicite : id -> hex (les plus courants)
-    const EXPLICIT = {
-        0: 0x000000,    // Air (transparent, mais couleur "none")
-        1: 0x1a1a22,    // Unloaded
-        2: METAL.Dirt,
-        3: multiply(METAL.Dirt, 0.92),    // Messy Dirt
-        4: 0x4da64d,    // Grass Block
-        5: METAL.Sand,
-        6: METAL.Clay,
-        7: METAL.Gravel,
-        8: METAL.Snow,
-        28: METAL.Stone,
-        29: multiply(METAL.Stone, 0.88),
-        30: 0xff00ff,   // placeholder (magenta vif pour le repérer)
-        31: METAL['Smooth Stone'],
-        32: METAL.Diorite,
-        33: multiply(METAL.Diorite, 0.98),
-        34: METAL.Andesite,
-        35: multiply(METAL.Andesite, 0.97),
-        36: METAL.Granite,
-        37: multiply(METAL.Granite, 0.98),
-        38: METAL.Sandstone,
-        39: METAL.Yellowstone,
-        40: 0x2e2e32,   // Coal Ore (stone+coal)
-        41: 0x96938f,   // Iron Ore
-        42: 0x9e8e6a,   // Gold Ore
-        43: 0x4b638b,   // Lapis Ore
-        44: 0x4f7c56,   // Emerald Ore
-        45: 0x788f94,   // Diamond Ore
-        46: METAL.Coal,
-        47: METAL.Iron,
-        48: METAL.Gold,
-        49: METAL['Lapis Lazuli'],
-        50: METAL.Emerald,
-        126: METAL.Water,
-        127: 0x3a3a44,  // Invisible solid (gris transparent-ish)
-        128: METAL.Bricks,
-        129: METAL['Stone Bricks'],
-        130: METAL['Dark Red Brick'],
-        131: METAL['Dark Red Stone'],
-        132: METAL.Quartz,
-        133: multiply(METAL.Quartz, 0.95),
-        134: multiply(METAL['Smooth Stone'], 0.97), // Engraved Stone
-        135: METAL.Mossy,
-        136: METAL.Cracked,
-        137: multiply(METAL.Sandstone, 1.02),
-        138: multiply(METAL.Sandstone, 1.0),
-        139: METAL.Ice,
-        140: METAL.Obsidian,
-        141: METAL.Hay,
-        142: METAL.Sponge,
-        143: METAL.Beacon,
-        145: METAL.Gold,
-        146: METAL.Moonstone,
-        147: METAL.Bedrock,
-        149: METAL.Cactus,
-        150: FLORA.Grass,
-        223: multiply(METAL.Dirt, 0.95),  // Dirt|GrassRoots
-        471: METAL.Magma,
-        475: multiply(METAL.Sandstone, 0.90), // Smooth Red Sandstone
-        650: 0xc35a3c,                       // Red Sand
-        1222: WOOD.Cherry.log,               // Cherry Log
-    };
-
-    // Ordre exact des couleurs pour chaque gamme (basé sur nameToId.json)
-    const HUE_ORDER_WOOL     = ['White','Orange','Magenta','Light Blue','Yellow','Lime','Pink','Gray','Light Gray','Cyan','Purple','Blue','Brown','Green','Red','Black'];
-    const HUE_ORDER_CONCRETE = ['Gray','Light Gray','Black','Blue','Brown','Cyan','Light Blue','Lime','Magenta','Orange','Pink','Purple','Red','White','Green','Yellow'];
-    const HUE_ORDER_GLASS    = ['Black','Blue','Brown','Cyan','Gray','Light Gray','Green','Light Blue','Lime','Magenta','Orange','Pink','Purple','Red','White','Yellow']; // 107..122
-    const HUE_ORDER_PLANKS   = ['White','Orange','Magenta','Light Blue','Yellow','Lime','Pink','Gray','Light Gray','Cyan','Purple','Blue','Brown','Green','Red','Black'];
-    const HUE_ORDER_CLAY     = ['White','Orange','Magenta','Light Blue','Yellow','Lime','Pink','Gray','Light Gray','Cyan','Purple','Blue','Brown','Green','Red','Black']; // 68..83
-    const HUE_ORDER_CERAMIC  = ['White','Orange','Magenta','Light Blue','Yellow','Lime','Pink','Gray','Light Gray','Cyan','Purple','Blue','Brown','Green','Red','Black']; // 245..308 (16 teintes × 4 rot, ordre WOOL)
-
-    // Blocs de base (laines / terres cuites / betons / verres / planches)
-    let id;
-    // 51..66 Wools (16)
-    id = 51; HUE_ORDER_WOOL.forEach(h => { EXPLICIT[id++] = colored(h, 'wool'); });
-    // 67 Baked Clay par défaut (terracotta brute) + 68..83 colored baked clay
-    EXPLICIT[67] = 0xa0664b;
-    id = 68; HUE_ORDER_CLAY.forEach(h => { EXPLICIT[id++] = colored(h, 'baked clay'); });
-    // 84..99 Concrete (16)
-    id = 84; HUE_ORDER_CONCRETE.forEach(h => { EXPLICIT[id++] = colored(h, 'concrete'); });
-    // 100..103 Leaves
-    EXPLICIT[100] = WOOD.Pine.leaves;
-    EXPLICIT[101] = WOOD.Aspen.leaves;
-    EXPLICIT[102] = WOOD.Maple.leaves;
-    EXPLICIT[103] = WOOD.Elm.leaves;
-    // 106 Glass (transparent générique)
-    EXPLICIT[106] = METAL.Glass;
-    // 107..122 Verres colorés (16)
-    id = 107; HUE_ORDER_GLASS.forEach(h => { EXPLICIT[id++] = multiply(colored(h, 'glass'), 0.85); });
-    // 123 unused / placeholder
-    EXPLICIT[123] = 0xff00ff;
-    // 124/125 lamps
-    EXPLICIT[124] = 0xffe680;
-    EXPLICIT[125] = 0xc8a74c;
-    // 228..243 Planks colorées (16)
-    id = 228; HUE_ORDER_PLANKS.forEach(h => { EXPLICIT[id++] = colored(h, 'planks'); });
-    // 245..308 Céramiques colorées (16 teintes × 4 rotations = 64)
-    id = 245;
-    for (let r = 0; r < 4; r++) {
-        HUE_ORDER_CERAMIC.forEach(h => { EXPLICIT[id++] = colored(h, 'ceramic'); });
-    }
-
-    // Essences de bois : chaque essence a log/planks/leaves/sapling/barkless,
-    // chaque décliné en plusieurs metas (rot, base, canopy, etc.). On va les
-    // remplir en parcourant le nameToId.
-    // (On s'appuie sur le nom pour retrouver l'ID ; on construit à la volée
-    // dans fillDynamic en lisant nameToId.json embarqué.)
-
-    /* ------------- Fallback par analyse de nom ------------- */
-
-    function findHueInName(lowerName) {
-        if (/\bwhite\b/.test(lowerName)) return 'White';
-        if (/\borange\b/.test(lowerName)) return 'Orange';
-        if (/\bmagenta\b/.test(lowerName)) return 'Magenta';
-        if (/\blight blue\b/.test(lowerName)) return 'Light Blue';
-        if (/\byellow\b/.test(lowerName)) return 'Yellow';
-        if (/\blime\b/.test(lowerName)) return 'Lime';
-        if (/\bpink\b/.test(lowerName)) return 'Pink';
-        if (/\blight gray\b/.test(lowerName)) return 'Light Gray';
-        if (/\bgray\b/.test(lowerName)) return 'Gray';
-        if (/\bcyan\b/.test(lowerName)) return 'Cyan';
-        if (/\bpurple\b/.test(lowerName)) return 'Purple';
-        if (/\bblue\b/.test(lowerName)) return 'Blue';
-        if (/\bbrown\b/.test(lowerName)) return 'Brown';
-        if (/\bgreen\b/.test(lowerName)) return 'Green';
-        if (/\bred\b/.test(lowerName)) return 'Red';
-        if (/\bblack\b/.test(lowerName)) return 'Black';
-        return null;
-    }
-
-    function materialFromName(lower) {
-        if (/\bwool\b/.test(lower)) return 'wool';
-        if (/\bconcrete\b/.test(lower)) return 'concrete';
-        if (/\bplanks?\b/.test(lower)) return 'planks';
-        if (/\bbaked clay\b|\bterracotta\b/.test(lower)) return 'baked clay';
-        if (/\bclay\b/.test(lower)) return 'clay';
-        if (/\b(glass|pane)\b/.test(lower)) return 'glass';
-        if (/\bceramic\b/.test(lower)) return 'ceramic';
-        if (/\btile(s|d)?\b/.test(lower)) return 'tile';
-        return null;
-    }
-
-    function woodFromName(lower) {
-        for (const key of Object.keys(WOOD)) {
-            const re = new RegExp(`\\b${key.toLowerCase()}\\b`);
-            if (re.test(lower)) return { name: key, palette: WOOD[key] };
-        }
-        return null;
-    }
-
-    // Assignations spécifiques par mot-clé
-    function fallbackColor(name) {
-        const lower = name.toLowerCase();
-
-        // Air/invisible/worldedit ghost
-        if (/^air\b|\bair\b/.test(lower) && !/plane/.test(lower)) return 0x000000;
-        if (/unloaded|placeholder|free_placeholder|unused|invisible|worldedit-ghost/i.test(lower)) return 0x20202a;
-
-        // Bois
-        const w = woodFromName(lower);
-        if (w) {
-            if (/\blog\b/.test(lower)) return w.palette.log;
-            if (/barkless/.test(lower)) return w.palette.barkless;
-            if (/\bplanks?\b/.test(lower)) return w.palette.planks;
-            if (/\bleaves?\b|canopy|hedge/.test(lower)) return w.palette.leaves;
-            if (/sapling/.test(lower)) return w.palette.sapling;
-            if (/door|trapdoor|ladder|fence|gate|stairs|slab|button|plate|sign/.test(lower)) return multiply(w.palette.planks, 0.92);
-            if (/coconut/.test(lower)) return w.palette.coconut || 0x6b4a2c;
-            return w.palette.log;
-        }
-
-        // Fleurs / plantes
-        if (/dandelion/.test(lower)) return FLORA.Dandelion;
-        if (/poppy|tulip|daisy|bluebell|allium|bluet|lily|rose|flower/.test(lower)) {
-            const hue = findHueInName(lower);
-            if (hue && FLOWER_BY_COLOR[hue.toLowerCase()]) return FLOWER_BY_COLOR[hue.toLowerCase()];
-            if (/poppy|rose|red/.test(lower)) return FLORA.Poppy;
-            if (/tulip|pink/.test(lower)) return FLORA.Tulip;
-            if (/daisy|white/.test(lower)) return FLORA.Daisy;
-            if (/bluebell|blue/.test(lower)) return FLORA.Bluebell;
-            if (/allium|purple/.test(lower)) return FLORA.Allium;
-            if (/dandelion|yellow/.test(lower)) return FLORA.Dandelion;
-            return FLORA.Flower;
-        }
-        if (/sapling|vine|leaves|leaves|hedge|bush|grass/.test(lower)) return 0x3f8a37;
-        if (/cactus|fat cactus|dry fat cactus/.test(lower)) return 0x3e8139;
-        if (/pumpkin|jack/.test(lower)) return 0xd07a1f;
-        if (/watermelon|melon/.test(lower)) return 0x3c9a3e;
-
-        // Pierres
-        if (/smooth stone/.test(lower)) return METAL['Smooth Stone'];
-        if (/stone brick/.test(lower)) return METAL['Stone Bricks'];
-        if (/dark red brick/.test(lower)) return METAL['Dark Red Brick'];
-        if (/dark red stone/.test(lower)) return METAL['Dark Red Stone'];
-        if (/cobble|rocky/.test(lower)) return METAL.Cobblestone;
-        if (/mossy/.test(lower)) return METAL.Mossy;
-        if (/cracked/.test(lower)) return METAL.Cracked;
-        if (/diorite/.test(lower)) return METAL.Diorite;
-        if (/andesite/.test(lower)) return METAL.Andesite;
-        if (/granite/.test(lower)) return METAL.Granite;
-        if (/sandstone/.test(lower)) return METAL.Sandstone;
-        if (/yellowstone/.test(lower)) return METAL.Yellowstone;
-        if (/obsidian|obby/.test(lower)) return METAL.Obsidian;
-        if (/bedrock/.test(lower)) return METAL.Bedrock;
-        if (/brick/.test(lower)) return METAL.Bricks;
-        if (/stone/.test(lower)) return METAL.Stone;
-        if (/engraved|marked|patterned|chiseled/.test(lower)) return multiply(METAL['Smooth Stone'], 0.95);
-
-        // Minerais / blocs de métal
-        if (/lapis/.test(lower)) return METAL['Lapis Lazuli'];
-        if (/emerald/.test(lower)) return METAL.Emerald;
-        if (/diamond/.test(lower)) return METAL.Diamond;
-        if (/redstone/.test(lower)) return METAL.Redstone;
-        if (/coal/.test(lower)) return METAL.Coal;
-        if (/golden|gold/.test(lower)) return METAL.Gold;
-        if (/iron/.test(lower)) return METAL.Iron;
-        if (/moonstone/.test(lower)) return METAL.Moonstone;
-        if (/quartz/.test(lower)) return METAL.Quartz;
-        if (/magma|lava|volcano/.test(lower)) return METAL.Magma;
-
-        // Eau / glace / neige
-        if (/water/.test(lower)) return METAL.Water;
-        if (/ice/.test(lower)) return METAL.Ice;
-        if (/snow|packed/.test(lower)) return METAL.Snow;
-        if (/glass|pane/.test(lower)) return METAL.Glass;
-        if (/sponge/.test(lower)) return METAL.Sponge;
-        if (/beacon/.test(lower)) return METAL.Beacon;
-        if (/hay|straw|wheat|corn|rice|cotton|cranberr/.test(lower)) return 0xc3a041;
-        if (/tilled|farmland|dirt|mud/.test(lower)) return METAL.Dirt;
-        if (/sand|beach/.test(lower)) return METAL.Sand;
-        if (/red sand/.test(lower)) return 0xc55c3e;
-        if (/clay/.test(lower)) return METAL.Clay;
-        if (/gravel|pebble/.test(lower)) return METAL.Gravel;
-        if (/chalk/.test(lower)) return 0xf5f5ef;
-
-        // Lampes
-        if (/lamp.*on|torch|glowstone|lantern|lit/.test(lower)) return 0xffd672;
-        if (/lamp.*off/.test(lower)) return 0x806d40;
-
-        // Nourriture / buvable
-        if (/bread|cornbread|steak|apple|cooked|melon|coconut|chili|bowl|potion|milk|mushroom/.test(lower)) {
-            if (/bread/.test(lower)) return 0xd9ab5c;
-            if (/steak/.test(lower)) return 0x8f4a35;
-            if (/apple|cranberr/.test(lower)) return 0xc43232;
-            if (/mushroom/.test(lower)) return 0xa04747;
-            if (/bowl|soup/.test(lower)) return 0x945a38;
-            if (/milk/.test(lower)) return 0xf4f4f4;
-            if (/chili|pepper/.test(lower)) return 0xd83b2b;
-            return 0xd09b5f;
-        }
-        if (/potion/.test(lower)) {
-            const h = findHueInName(lower);
-            if (h && FLOWER_BY_COLOR[h.toLowerCase()]) return FLOWER_BY_COLOR[h.toLowerCase()];
-            return 0x60c0f0;
-        }
-
-        // Armes / véhicules / internes (gris métal)
-        if (/ak-47|m16|mp40|tar-21|m1911|awp|minigun|rocket|rpg|grenade|grenad|fireball|iceball|snowball|kart|boat|shears|shield|bouncy|updraft|snowdash/.test(lower)) {
-            if (/fireball|lava/.test(lower)) return 0xff6a1f;
-            if (/iceball|ice/.test(lower)) return 0x94d6ee;
-            if (/snowball|snow/.test(lower)) return 0xf0f4ff;
-            return 0x757c82;
-        }
-
-        // Mob/entités colorées (teinte par nom)
-        if (/pig/i.test(lower)) return 0xef9ab3;
-        if (/cow/i.test(lower)) return 0x553c2d;
-        if (/sheep/i.test(lower)) return 0xe6e1d6;
-        if (/chicken|hen/i.test(lower)) return 0xf0efe8;
-        if (/zombie/i.test(lower)) return 0x2f7a49;
-        if (/skeleton/i.test(lower)) return 0xe4e2cc;
-        if (/creeper/i.test(lower)) return 0x4f9d3c;
-
-        // Blocs fonctionnels (furnace, workbench, chest, protector, etc.)
-        if (/furnace/.test(lower)) return 0x4a4a4a;
-        if (/workbench|artisan/.test(lower)) return 0x8a5f3a;
-        if (/chest|loot|crate/.test(lower)) return 0x9a6b3a;
-        if (/protector/.test(lower)) return 0x6352ff;
-        if (/compass|name tag|book|bookshelf/.test(lower)) return 0x8e5d32;
-        if (/mailbox|board|sign/.test(lower)) return 0x866243;
-        if (/board/.test(lower)) return 0x724f2f;
-
-        // Couleur nommée générique + matériau
-        const hue = findHueInName(lower);
-        const mat = materialFromName(lower);
-        if (hue) return colored(hue, mat);
-
-        // Matériau sans couleur explicite
-        if (mat === 'glass') return METAL.Glass;
-        if (mat === 'planks') return 0xa0794b;
-        if (mat === 'baked clay') return 0xa0664b;
-        if (mat === 'concrete') return 0x8a8a8a;
-        if (mat === 'wool') return 0xe0d8c8;
-        if (mat === 'clay') return METAL.Clay;
-        if (mat === 'ceramic') return 0xeeeeea;
-        if (mat === 'tile') return 0xbbbbbb;
-
-        // Dernier recours
-        return 0xb08060;
-    }
-
-    // Initialiser le cache et les entrées dérivées du JSON de nom -> id
-    let NAME_TO_ID = null;
-    let CACHE = {};
-    let initialized = false;
-
-    function _nameForId(id) {
-        if (initFromNameMap._inv) return initFromNameMap._inv[id];
-        if (!NAME_TO_ID) return '';
-        initFromNameMap._inv = {};
-        for (const [n,i] of Object.entries(NAME_TO_ID)) initFromNameMap._inv[i] = n;
-        return initFromNameMap._inv[id] || '';
-    }
-
-    function initFromNameMap(nameMap) {
-        NAME_TO_ID = nameMap;
-        // Reset inverse cache
-        initFromNameMap._inv = null;
-
-        // Pour chaque essence de bois, trouver les ids par leurs noms et les renseigner.
-        for (const [wname, palette] of Object.entries(WOOD)) {
-            const prefix = wname + ' ';
-            const logName = prefix + 'Log';
-            const plankName = prefix + 'Wood Planks';
-            const leavesName = prefix + 'Leaves';
-            const saplingName = prefix + 'Sapling';
-            const barklessName = 'Barkless ' + wname + ' Log';
-            if (nameMap[logName] !== undefined) EXPLICIT[nameMap[logName]] = palette.log;
-            if (nameMap[plankName] !== undefined) EXPLICIT[nameMap[plankName]] = palette.planks;
-            if (nameMap[leavesName] !== undefined) EXPLICIT[nameMap[leavesName]] = palette.leaves;
-            if (nameMap[saplingName] !== undefined) EXPLICIT[nameMap[saplingName]] = palette.sapling;
-            if (nameMap[barklessName] !== undefined) EXPLICIT[nameMap[barklessName]] = palette.barkless;
-            if (nameMap[leavesName + '|TreeCanopy'] !== undefined) EXPLICIT[nameMap[leavesName + '|TreeCanopy']] = multiply(palette.leaves, 0.92);
-            if (nameMap[logName + '|TreeBase|'+wname] !== undefined) EXPLICIT[nameMap[logName + '|TreeBase|'+wname]] = palette.log;
-        }
-        initialized = true;
-    }
-
-    function getBlockColor(id, nameHint) {
-        if (EXPLICIT[id] !== undefined) return EXPLICIT[id];
-        if (CACHE[id] !== undefined) return CACHE[id];
-        // Si on a le nom, utiliser fallbackColor par nom
-        let name = nameHint;
-        if (!name && NAME_TO_ID) {
-            // lookup inverse: assez coûteux -> construire inverse
-            if (!initFromNameMap._inv) {
-                initFromNameMap._inv = {};
-                if (NAME_TO_ID) for (const [n,i] of Object.entries(NAME_TO_ID)) initFromNameMap._inv[i] = n;
-            }
-            name = initFromNameMap._inv[id];
-        }
-        const c = fallbackColor(name || ('block_'+id));
-        CACHE[id] = c;
-        return c;
-    }
-
     global.BlockColors = {
-        initFromNameMap,
-        getBlockColor,
-        _nameForId,
+        initFromNameMap: function(map) { if (typeof BloxdBlockColors !== 'undefined') BloxdBlockColors.init(map); },
+        getBlockColor:   function(id) { return (typeof BloxdBlockColors !== 'undefined') ? BloxdBlockColors.hex(id) : 0x808080; },
+        _nameForId:      function(id) { return (typeof BloxdBlockColors !== 'undefined') ? BloxdBlockColors.nameForId(id) : ''; },
     };
-
 })(window);
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -1263,48 +846,13 @@ window.parseSchem = function(data) {
  * Optimized VertexData rendering for schematic assets (Babylon)
  */
 
-const ASSET_BLOCK_COLORS = {
-    1:  0x8a8a8a, 2:  0x6b4423, 3:  0x7a5434, 4:  0x4ea64e,
-    5:  0xe8d98a, 6:  0x9aa3a8, 7:  0x8c8c8c, 8:  0xf5f9fc,
-    28: 0x7d7d7d, 29: 0x6e6e6e, 31: 0x949494,
-    9:  0x7a4d2a, 10: 0x6a4a2f, 11: 0x765036, 12: 0x725033,
-    13: 0xb9b7aa, 14: 0x7d5a38, 21: 0x9a6b3c, 22: 0xd4c8a7,
-    23: 0x9b6f45, 24: 0x9a6d40, 25: 0x8a663d, 26: 0x91643f,
-    15: 0xa7773f, 16: 0xd6c79b, 17: 0x9e6745, 18: 0x9b7448,
-    19: 0x8b693f, 20: 0x936743,
-    100: 0x2f6f2d, 101: 0x8fb35a, 102: 0x3f8f35, 103: 0x4f8a3a,
-    208: 0x2f6f2d, 209: 0x8fb35a, 210: 0x3f8f35, 211: 0x4f8a3a,
-    491: 0x6b8f35, 492: 0x3b7a34, 493: 0x5b9f3a, 494: 0x6b8f35,
-    495: 0x3b7a34, 496: 0x5b9f3a, 653: 0xc7772d, 654: 0xc7772d,
-    911: 0x6ea84f, 938: 0x6ea84f, 1226: 0xe8a0b8, 1259: 0xe8a0b8,
-    497: 0x6a4a2f, 498: 0x765036, 499: 0x725033, 500: 0xb9b7aa,
-    501: 0x7d5a38, 502: 0x8a633b, 503: 0x8a633b, 504: 0xb07a44,
-    909: 0x8c5f35, 910: 0xb9854c, 937: 0x8c5f35, 1222: 0x8b4a3c,
-    1223: 0xa86b55, 1224: 0xa86b55, 1225: 0xc58a72, 1258: 0x8b4a3c,
-    150: 0x56a832, 223: 0x6b4b2e, 1109: 0x4aa133, 1110: 0x5bb943
-};
-
 function colorFromHex(hex) {
-    return {
-        r: ((hex >> 16) & 255) / 255,
-        g: ((hex >> 8) & 255) / 255,
-        b: (hex & 255) / 255
-    };
+    return (typeof BloxdBlockColors !== 'undefined') ? BloxdBlockColors.colorFromHex(hex)
+        : { r: ((hex >> 16) & 255) / 255, g: ((hex >> 8) & 255) / 255, b: (hex & 255) / 255 };
 }
 
 function getBlockColor(id) {
-    // Palette fidèle BlockColors (identique au Terrain Editor) en priorité.
-    if (window.BlockColors && typeof window.BlockColors.getBlockColor === 'function') {
-        return colorFromHex(window.BlockColors.getBlockColor(id));
-    }
-    if (ASSET_BLOCK_COLORS[id] !== undefined) {
-        return colorFromHex(ASSET_BLOCK_COLORS[id]);
-    }
-    // Fallback : couleur déterministe variée.
-    const r = ((id * 37) % 90 + 90) / 255;
-    const g = ((id * 73) % 90 + 85) / 255;
-    const b = ((id * 109) % 70 + 70) / 255;
-    return { r, g, b };
+    return colorFromHex((typeof BloxdBlockColors !== 'undefined') ? BloxdBlockColors.hex(id) : 0x808080);
 }
 window.assetGetBlockColor = getBlockColor;
 
@@ -1329,60 +877,107 @@ window.createMeshFromSchem = function(scene, schem) {
     const blocks = schem.blocks;
     if (!blocks || blocks.length === 0) return null;
 
-    let allPositions = [], allIndices = [], allNormals = [], allColors = [];
-    let vertexOffset = 0;
-
     const cubeData = BABYLON.VertexData.CreateBox({ size: 1 });
     const basePositions = cubeData.positions;
     const baseIndices = cubeData.indices;
     const baseNormals = cubeData.normals;
+    const VERTS = basePositions.length / 3;          // 24 pour un cube
+    const IDX_PER = baseIndices.length;              // 36
 
+    // ── 1. Boîte englobante ─────────────────────────────────────────────
+    let mnX = Infinity, mnY = Infinity, mnZ = Infinity;
+    let mxX = -Infinity, mxY = -Infinity, mxZ = -Infinity;
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (!b || b.id === 0) continue;
+        const x = b.x | 0, y = b.y | 0, z = b.z | 0;
+        if (x < mnX) mnX = x; if (x > mxX) mxX = x;
+        if (y < mnY) mnY = y; if (y > mxY) mxY = y;
+        if (z < mnZ) mnZ = z; if (z > mxZ) mxZ = z;
+    }
+    if (!isFinite(mnX)) return null;
+    const sx = mxX - mnX + 1, sy = mxY - mnY + 1, sz = mxZ - mnZ + 1;
+    const volume = sx * sy * sz;
+
+    // ── 2. Grille d'occupation ──────────────────────────────────────────
     // Perf : un voxel entouré des 6 côtés n'a aucune face visible -> on ne
     // construit pas son cube. Gain important sur les gros volumes pleins
-    // (sols, murs épais...) qui généraient des centaines de milliers de
+    // (sols, murs épais…) qui généraient des centaines de milliers de
     // sommets invisibles et bloquaient le thread principal au chargement.
-    const occupied = new Set();
-    for (const block of blocks) {
-        if (!block || block.id === 0) continue;
-        occupied.add((block.x || 0) + ',' + (block.y || 0) + ',' + (block.z || 0));
+    //
+    // L'index d'occupation était un Set de chaînes "x,y,z" : ~7 allocations
+    // de string PAR bloc (≈ 1,9 M pour la bibliothèque complète), ce qui coûtait
+    // plus cher que le maillage lui-même. On le remplace par une grille
+    // booléenne Uint8Array indexée par arithmétique (zéro allocation par
+    // consultation) ; si la boîte englobante est démesurée on retombe sur un
+    // Set de clés NUMÉRIQUES (mêmes formules, donc sans collision possible).
+    const useGrid = volume > 0 && volume <= 8 * 1024 * 1024;
+    const grid = useGrid ? new Uint8Array(volume) : null;
+    const keys = useGrid ? null : new Set();
+    const cellIndex = (x, y, z) => ((x - mnX) * sz + (z - mnZ)) * sy + (y - mnY);
+    const inside = (x, y, z) => x >= mnX && x <= mxX && y >= mnY && y <= mxY && z >= mnZ && z <= mxZ;
+    const isSolid = grid
+        ? (x, y, z) => inside(x, y, z) && grid[cellIndex(x, y, z)] === 1
+        : (x, y, z) => inside(x, y, z) && keys.has(cellIndex(x, y, z));
+
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (!b || b.id === 0) continue;
+        const k = cellIndex(b.x | 0, b.y | 0, b.z | 0);
+        if (grid) grid[k] = 1; else keys.add(k);
     }
-    const isSolid = (x, y, z) => occupied.has(x + ',' + y + ',' + z);
 
-    for (const block of blocks) {
-        if (!block || block.id === 0) continue;
-
-        const bx = block.x || 0, by = block.y || 0, bz = block.z || 0;
-
+    // ── 3. Combien de voxels visibles ? (alloue les buffers à la taille exacte)
+    let visible = 0;
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (!b || b.id === 0) continue;
+        const bx = b.x | 0, by = b.y | 0, bz = b.z | 0;
         if (isSolid(bx + 1, by, bz) && isSolid(bx - 1, by, bz) &&
             isSolid(bx, by + 1, bz) && isSolid(bx, by - 1, bz) &&
-            isSolid(bx, by, bz + 1) && isSolid(bx, by, bz - 1)) {
-            continue;
-        }
+            isSolid(bx, by, bz + 1) && isSolid(bx, by, bz - 1)) continue;
+        visible++;
+    }
+    if (!visible) return null;
+
+    const vertexCount = visible * VERTS;
+    const positions = new Float32Array(vertexCount * 3);
+    const normals = new Float32Array(vertexCount * 3);
+    const colors = new Float32Array(vertexCount * 4);
+    const indices = vertexCount > 65535 ? new Uint32Array(visible * IDX_PER) : new Uint16Array(visible * IDX_PER);
+
+    // ── 4. Remplissage ──────────────────────────────────────────────────
+    let vi = 0, ii = 0, vertexOffset = 0;
+    for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        if (!block || block.id === 0) continue;
+        const bx = block.x | 0, by = block.y | 0, bz = block.z | 0;
+        if (isSolid(bx + 1, by, bz) && isSolid(bx - 1, by, bz) &&
+            isSolid(bx, by + 1, bz) && isSolid(bx, by - 1, bz) &&
+            isSolid(bx, by, bz + 1) && isSolid(bx, by, bz - 1)) continue;
 
         const color = getBlockColor(block.id);
-
-        for (let i = 0; i < basePositions.length; i += 3) {
-            allPositions.push(basePositions[i] + bx + 0.5);
-            allPositions.push(basePositions[i+1] + by + 0.5);
-            allPositions.push(basePositions[i+2] + bz + 0.5);
+        let p = vi * 3, n = vi * 3, c = vi * 4;
+        for (let k = 0; k < basePositions.length; k += 3) {
+            positions[p] = basePositions[k] + bx + 0.5;
+            positions[p + 1] = basePositions[k + 1] + by + 0.5;
+            positions[p + 2] = basePositions[k + 2] + bz + 0.5;
+            normals[n] = baseNormals[k];
+            normals[n + 1] = baseNormals[k + 1];
+            normals[n + 2] = baseNormals[k + 2];
+            colors[c] = color.r; colors[c + 1] = color.g; colors[c + 2] = color.b; colors[c + 3] = 1.0;
+            p += 3; n += 3; c += 4;
         }
-        for (let i = 0; i < baseNormals.length; i++) allNormals.push(baseNormals[i]);
-        for (let i = 0; i < baseIndices.length; i++) allIndices.push(baseIndices[i] + vertexOffset);
-
-        const num = basePositions.length / 3;
-        for (let v = 0; v < num; v++) {
-            allColors.push(color.r, color.g, color.b, 1.0);
-        }
-        vertexOffset += num;
+        for (let k = 0; k < IDX_PER; k++) indices[ii++] = baseIndices[k] + vertexOffset;
+        vi += VERTS;
+        vertexOffset += VERTS;
     }
 
-    if (allPositions.length === 0) return null;
-
     const vertexData = new BABYLON.VertexData();
-    vertexData.positions = new Float32Array(allPositions);
-    vertexData.indices = allPositions.length / 3 > 65535 ? new Uint32Array(allIndices) : new Uint16Array(allIndices);
-    vertexData.normals = new Float32Array(allNormals);
-    vertexData.colors = new Float32Array(allColors);
+    vertexData.positions = positions;
+    vertexData.indices = indices;
+    vertexData.normals = normals;
+    vertexData.colors = colors;
 
     const mesh = new BABYLON.Mesh("schemMesh", scene);
     vertexData.applyToMesh(mesh);
@@ -1502,7 +1097,7 @@ window.AssetInstance = class AssetInstance {
             BABYLON.Vector3.TransformCoordinatesToRef(tmpV, wm, tmpV);
             let gid = (tm && tm.getSurfaceBlockAtWorld) ? tm.getSurfaceBlockAtWorld(Math.round(tmpV.x), Math.round(tmpV.z)) : null;
             if (!gid) gid = 2;
-            const c = (window.BlockColors && window.BlockColors.getBlockColor(gid)) || 0x6e4b2a;
+            const c = (typeof BloxdBlockColors !== 'undefined') ? BloxdBlockColors.hex(gid) : 0x6e4b2a;
             return [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255];
         };
         // Colonnes : "bx,bz" -> { topY, col }. Empreinte = baseY, bordure = pente (baseY - ring).
@@ -1586,10 +1181,12 @@ window.AssetManager = class AssetManager {
     constructor(scene) {
         this.scene = scene;
         this.templates = {};        // name -> sourceMesh (null tant que non créé à la demande)
-        this.templateMeta = {};     // name -> metadata (catégorie, taille…)
+        this.templateMeta = {};     // name -> metadata (catégorie, taille…, pending)
         this.templateSchem = {};    // name -> schem (blocks[], size, totalBlocks)
         this.instances = [];
         this._nextId = 1;
+        this._namesCache = null;    // cache de getTemplateNames()
+        this._namesDirty = true;
         this.onChanged = null;
     }
 
@@ -1597,10 +1194,49 @@ window.AssetManager = class AssetManager {
         if (typeof this.onChanged === 'function') this.onChanged(this.instances);
     }
 
+    /**
+     * Inscrit une entrée « squelette » : uniquement les métadonnées (nom,
+     * catégorie, dimensions, nombre de blocs), SANS blocs et SANS mesh.
+     * C'est ce que permet l'index de la bibliothèque (schems/index.json) :
+     * les ~900 assets sont listés et filtrables instantanément, et leur
+     * contenu n'est téléchargé + parsé qu'au premier placement.
+     * Un objet marqué `pending` sera complété par registerTemplate() plus tard.
+     */
+    registerTemplateMeta(name, metadata = {}) {
+        if (this.templateSchem[name]) return false;   // déjà chargé : ne pas régresser
+        this.templateMeta[name] = Object.assign({ pending: true }, metadata);
+        this._namesDirty = true;
+        return true;
+    }
+
+    /** true si l'asset existe dans la bibliothèque (avec ou sans données). */
+    hasEntry(name) {
+        return Object.prototype.hasOwnProperty.call(this.templateMeta, name)
+            || Object.prototype.hasOwnProperty.call(this.templateSchem, name);
+    }
+
+    /** Liste triée des noms d'assets connus (entrées squelette incluses). */
+    getTemplateNames() {
+        if (!this._namesCache || this._namesDirty) {
+            const set = new Set(Object.keys(this.templateMeta));
+            for (const k in this.templateSchem) set.add(k);
+            for (const k in this.templates) if (this.templates[k]) set.add(k);
+            this._namesCache = Array.from(set).sort();
+            this._namesDirty = false;
+        }
+        return this._namesCache;
+    }
+
+    /** Les blocs sont-ils réellement disponibles (peut être posé sans attendre) ? */
+    hasTemplateData(name) {
+        return this.hasTemplate(name);
+    }
+
     registerTemplate(name, sourceMesh, schemData = null, metadata = {}) {
         this.templateMeta[name] = metadata || {};
         if (schemData) this.templateSchem[name] = schemData;
         this.templates[name] = sourceMesh || null;  // null = mesh créé à la demande (lazy)
+        this._namesDirty = true;
 
         if (sourceMesh) {
             if (schemData) sourceMesh.schemData = schemData;
@@ -2858,14 +2494,9 @@ window.TerrainManager = class TerrainManager {
     }
 
     _getBlockColor01(id) {
-        // Palette fidèle BlockColors (eau=bleu, herbe, sable…) — identique au Terrain Editor.
-        if (window.BlockColors && typeof window.BlockColors.getBlockColor === 'function') {
-            const c = window.BlockColors.getBlockColor(id);
-            return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
-        }
+        if (typeof BloxdBlockColors !== 'undefined') return BloxdBlockColors.colorFromHex(BloxdBlockColors.hex(id));
         if (typeof window.assetGetBlockColor === 'function') return window.assetGetBlockColor(id);
-        const c = 0x8a8a8a;
-        return { r: ((c >> 16) & 255) / 255, g: ((c >> 8) & 255) / 255, b: (c & 255) / 255 };
+        return { r:0.54, g:0.54, b:0.54 };
     }
 
     // Mesh du terrain : cubes complets si petit, sinon surface (1 quad/colonne) pour rester léger.

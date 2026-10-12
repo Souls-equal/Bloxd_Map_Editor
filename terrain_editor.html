@@ -8,6 +8,8 @@
     <!-- Architecture multi-fichiers : tous les fichiers terrain_editor.* doivent rester dans le MÊME dossier -->
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAA5FBMVEVHcEwAAACb6W+BVTpmQiwvGQyt8YQmFAqYZ0Z71FSK317R0dGt8YIZbQ9lQixrw0lAIxM4HA7CwsKtra2U4mqX5m6h7HWJ4F6M3mCg6Xau742s8oITXA0ZbBQbahGZ6W6a6G4TXAscWRIXbg8wGQsSXQs4HA961VR/01Ws7oQlEgsgdhMwMTOve1Oc6W8jEghvUDiM4WITXApqwkhSpDVSpDSw84I4HQyueVKZkItjPiZUpDRpQCdnxEWWaEZ0w09wQylqxElSpTSJXkRSpDZOnzBGTB9lQi2BVTuYkYq4uLikpaao1sLHAAAAAXRSTlMAQObYZgAAALZJREFUGNNNz1dTAkEQBODr3t3LgfMEBQNKUAmSRDGDokj4//+Hc+8srx/m4auZqmnDyAIYxQDHRwUCHIc0D/8ENzzxXdcsM1sCx65pkqyQ9V/B15wD8oJVnjY1/HxHD7x2WAsCS8Nm9fly53cuz9tDpWG9/HgLpz2rcdaKNchFKEU06QOl7ES8CmHfdxU8XGl4f356lHJm4cDLHxnZwpZKYZtK/vqtEKUYuwT/bWyFNEmxoB4w9nFzDKT7ft/PAAAAAElFTkSuQmCC">
     <link rel="stylesheet" href="terrain_editor.css">
+    <!-- Moteur 3D : la requête part dès le <head>, en parallèle du CSS -->
+    <link rel="preload" as="script" href="terrain_editor_babylon.min.js">
 </head>
 
 <body>
@@ -175,6 +177,26 @@
                     <div class="form-section">
                         <div class="section-title"><i class="fas fa-seedling"></i> <span data-i18n="secBiomes">Biomes (cliquer pour défaut)</span></div>
                         <div class="biomes-grid" id="biomes-grid"></div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="section-title"><i class="fas fa-th"></i> <span data-i18n="secZones">Zones du terrain</span></div>
+                        <p style="color: var(--text-muted); font-size: 0.78rem; margin: 0 0 8px;" data-i18n="zoneHint">Créez des zones adjacentes pour construire un grand monde sans faire laguer. Seule la zone active est chargée.</p>
+                        <div style="text-align: center; margin-bottom: 8px;">
+                            <button class="btn btn-secondary" id="zone-add-top" style="padding: 2px 12px; font-size: 0.8rem;">▲</button>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                            <button class="btn btn-secondary" id="zone-add-left" style="padding: 2px 12px; font-size: 0.8rem;">◀</button>
+                            <canvas id="zone-grid-canvas" style="border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: #0f172a;"></canvas>
+                            <button class="btn btn-secondary" id="zone-add-right" style="padding: 2px 12px; font-size: 0.8rem;">▶</button>
+                        </div>
+                        <div style="text-align: center; margin: 8px 0;">
+                            <button class="btn btn-secondary" id="zone-add-bottom" style="padding: 2px 12px; font-size: 0.8rem;">▼</button>
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px;">
+                            <span id="zone-active-label" style="font-size: 0.82rem; color: var(--accent); font-weight: 600;">Zone 1</span>
+                            <button class="btn btn-secondary" id="zone-delete" style="padding: 4px 10px; font-size: 0.78rem; color: var(--danger);" data-i18n="btnDeleteZone"><i class="fas fa-trash-alt"></i> Suppr. zone</button>
+                        </div>
                     </div>
                 </div>
 
@@ -392,6 +414,20 @@
                     </div>
                 </div>
 
+                <div class="form-group" style="background: rgba(56, 189, 248, 0.08); border: 1px solid var(--accent-cyan); border-radius: 2px; padding: 10px 12px;">
+                    <label style="font-weight: 600; margin-bottom: 6px; display: block;" data-i18n="modalExportScope">📦 Périmètre d'export</label>
+                    <div style="display: flex; flex-direction: column; gap: 6px; margin-left: 4px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 0.88rem;">
+                            <input type="radio" name="export-scope" value="active" checked>
+                            <span data-i18n="modalExportActive">Zone active uniquement</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 0.88rem;">
+                            <input type="radio" name="export-scope" value="all">
+                            <span data-i18n="modalExportAll">Toutes les zones (fusionnées dans un seul .bloxdschem)</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="form-group" style="background: rgba(139, 92, 246, 0.08); border: 1px solid var(--accent-purple); border-radius: 2px; padding: 10px 12px;">
                     <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
                         <input type="checkbox" id="export-pixelated">
@@ -460,10 +496,23 @@
         </div>
     </div>
 
-    <script src="terrain_editor_babylon.min.js"></script>
-    <!-- Code propre + JSZip (fusionné) -->
-    <script src="terrain_editor.js"></script>
-    <script src="welcome.js"></script>
+    <!--
+        PERF — terrain_editor_babylon.min.js pèse 6,5 Mo (1,4 Mo transféré).
+        C'est de loin le plus gros fichier du site : sur un portable lent, le
+        simple fait de le *compiler* coûte plusieurs centaines de ms.
+        • `defer` : le HTML de l'éditeur (panneaux, écrans de chargement) est
+          parseé et peint pendant le téléchargement, au lieu d'être bloqué.
+        • le `preload` dans <head> fait démarrer le téléchargement tout de suite.
+        • le Service Worker (sw.js) le garde en cache : à la 2ᵉ visite il est lu
+          depuis le disque, la page s'ouvre sans réseau.
+        • JSZip (95 Ko) n'est plus dans terrain_editor.js : il est chargé par
+          `ensureJsZip()` seulement quand on exporte un .zip.
+    -->
+    <script defer src="terrain_editor_babylon.min.js"></script>
+    <!-- Code propre de l'éditeur -->
+    <script defer src="terrain_editor.js"></script>
+    <script defer src="welcome.js"></script>
+    <script defer src="app-cache.js"></script>
     <script>
         (function () {
             function openGuide() {
