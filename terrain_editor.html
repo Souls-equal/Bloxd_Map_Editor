@@ -49,6 +49,9 @@
                         <div class="coach-head">
                             <span data-i18n="coachTitle">3 étapes pour ne pas se perdre</span>
                             <button type="button" id="btn-open-guide" class="guide-chip" data-i18n="coachMore">Guide des formats</button>
+                            <!-- Croix : masque la carte pour la session. Volontairement non mémorisé :
+                                 la carte revient au prochain rechargement de la page (rien n'est perdu). -->
+                            <button type="button" class="card-close" data-dismiss-card data-i18n-title="dismissCardTitle" title="Masquer cette carte (elle revient au rechargement de la page)"><i class="fas fa-times"></i></button>
                         </div>
                         <ol class="coach-steps">
                             <li data-i18n="coachStep1">Cet onglet règle la taille, la graine et les biomes.</li>
@@ -57,7 +60,9 @@
                         </ol>
                     </div>
                     <div class="format-card">
-                        <div class="section-title" style="margin-bottom:6px;"><i class="fas fa-exchange-alt"></i> <span data-i18n="formatTitle">Quel fichier pour quoi ?</span></div>
+                        <div class="section-title" style="margin-bottom:6px;"><i class="fas fa-exchange-alt"></i> <span data-i18n="formatTitle">Quel fichier pour quoi ?</span>
+                            <button type="button" class="card-close" data-dismiss-card data-i18n-title="dismissCardTitle" title="Masquer cette carte (elle revient au rechargement de la page)"><i class="fas fa-times"></i></button>
+                        </div>
                         <p class="format-lead" data-i18n="formatLead">Trois formats différents. Les mélanger est la cause n°1 des erreurs.</p>
                         <ul class="format-list">
                             <li><code>.bloxdschem</code> <span data-i18n="formatBloxd">fichier du jeu. Charge-le avec //schematic load nom (sans l'extension).</span></li>
@@ -313,11 +318,21 @@
 
             </div>
 
-            <div style="padding: 16px 20px 8px;">
-                <button class="btn btn-export" id="btn-download-project" data-i18n="btnDownloadZip">
-                    <i class="fas fa-file-export"></i> 👉 Télécharger pour Bloxd (.bloxdschem)
+            <!-- Zone « Téléchargement » repliable.
+                 Flèche vers le BAS = cacher la zone · flèche vers le HAUT = la remontrer.
+                 L'état est mémorisé (localStorage) : la zone reste cachée d'une visite à l'autre,
+                 mais la barre « Téléchargement » reste toujours visible pour la rouvrir. -->
+            <div class="export-zone" id="export-zone">
+                <button type="button" class="export-zone-toggle" id="export-zone-toggle" aria-expanded="true" aria-controls="export-zone-body" data-i18n-title="exportZoneToggleTitle" title="Cacher / afficher la zone de téléchargement">
+                    <span class="export-zone-label"><i class="fas fa-download"></i> <span data-i18n="exportZoneTitle">Téléchargement</span></span>
+                    <i class="fas fa-chevron-down export-zone-arrow" aria-hidden="true"></i>
                 </button>
-                <p class="format-hint" data-i18n="formatDownloadHint">Petit monde → 1 .bloxdschem. Monde trop grand → un .zip. Le .json n'est pas inclus : c'est le bouton en dessous.</p>
+                <div class="export-zone-body" id="export-zone-body">
+                    <button class="btn btn-export" id="btn-download-project" data-i18n="btnDownloadZip">
+                        <i class="fas fa-file-export"></i> 👉 Télécharger pour Bloxd (.bloxdschem)
+                    </button>
+                    <p class="format-hint" data-i18n="formatDownloadHint">Petit monde → 1 .bloxdschem. Monde trop grand → un .zip. Le .json n'est pas inclus : c'est le bouton en dessous.</p>
+                </div>
             </div>
 
             <div class="sb-collapsible" style="padding: 0 20px 16px;">

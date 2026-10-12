@@ -866,3 +866,51 @@ input[type=range]::-webkit-slider-thumb {
 .sb-collapsible.is-collapsed > :not(.sb-header) { display: none !important; }
 .sb-collapsible.is-collapsed > .sb-header { border-bottom-color: transparent; padding-bottom: 0; margin-bottom: 0 !important; }
 .sb-collapsible.is-collapsed { margin-bottom: 10px; }
+
+/* Croix « masquer » des cartes d'aide (« 3 étapes… » et « Quel fichier pour quoi ? »).
+   Différence avec le repliage ci-dessus : ici la carte disparaît complètement et
+   l'état n'est PAS enregistré — un rechargement de la page la fait revenir. */
+.card-close {
+    margin-left: auto;              /* pousse la croix tout à droite du titre */
+    flex: 0 0 auto;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+/* Le titre de section colore tous ses <i> en cyan : la croix garde sa couleur à elle. */
+.card-close i { color: inherit; font-size: inherit; }
+.card-close:hover { color: #ff6b6b; background: rgba(255, 107, 107, 0.12); border-color: rgba(255, 107, 107, 0.45); }
+.card-close:focus-visible { outline: 1px solid var(--accent-cyan); outline-offset: 1px; }
+.coach-card.is-dismissed, .format-card.is-dismissed { display: none !important; }
+
+/* Zone « Téléchargement » repliable : flèche ▼ = cacher, flèche ▲ = remontrer.
+   La barre de titre reste toujours affichée, la zone ne peut donc jamais « disparaître »
+   sans laisser de moyen de la rouvrir. */
+.export-zone { padding: 12px 20px 8px; border-top: 1px solid var(--border-color); }
+.export-zone-toggle {
+    width: 100%;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 6px 0;
+    background: transparent; border: 0;
+    color: var(--text-muted);
+    font-size: 0.8rem; font-weight: 700; text-align: left;
+    cursor: pointer;
+    transition: color 0.15s;
+}
+.export-zone-toggle:hover { color: var(--accent-cyan); }
+.export-zone-toggle:focus-visible { outline: 1px solid var(--accent-cyan); outline-offset: 2px; }
+.export-zone-label { display: flex; align-items: center; gap: 8px; }
+.export-zone-arrow { color: var(--accent-cyan); font-size: 0.8rem; transition: transform 0.18s ease; }
+.export-zone-body { padding-top: 6px; }
+.export-zone.is-hidden .export-zone-body { display: none; }
+/* Zone cachée → la flèche pointe vers le haut : un clic remontre la zone. */
+.export-zone.is-hidden .export-zone-arrow { transform: rotate(180deg); }
+.export-zone.is-hidden { padding-bottom: 12px; }
