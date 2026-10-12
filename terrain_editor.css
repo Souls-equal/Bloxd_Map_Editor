@@ -849,3 +849,20 @@ input[type=range]::-webkit-slider-thumb {
 .format-list code, .coach-steps code { color: var(--accent-cyan); font-size: 0.72rem; }
 .format-lead, .format-hint { color: var(--text-muted); font-size: 0.75rem; line-height: 1.45; margin: 4px 0 8px; }
 .format-hint { margin: 8px 0 0; }
+
+/* Sidebar repliable : chaque bloc (aide, formats, sections) se replie sur son titre */
+.sb-header { cursor: pointer; user-select: none; }
+.sb-header:focus-visible { outline: 1px solid var(--accent-cyan); outline-offset: 2px; }
+.sb-header:hover { color: var(--accent-cyan); }
+.sb-chevron {
+    font-size: 0.7rem;
+    width: 12px;
+    flex: 0 0 auto;
+    color: var(--accent-cyan);
+    transition: transform 0.15s ease;
+}
+.sb-header.coach-head { justify-content: flex-start; }
+.sb-collapsible.is-collapsed > .sb-header .sb-chevron { transform: rotate(-90deg); }
+.sb-collapsible.is-collapsed > :not(.sb-header) { display: none !important; }
+.sb-collapsible.is-collapsed > .sb-header { border-bottom-color: transparent; padding-bottom: 0; margin-bottom: 0 !important; }
+.sb-collapsible.is-collapsed { margin-bottom: 10px; }
