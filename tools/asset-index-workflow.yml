@@ -1,0 +1,37 @@
+name: Vérifier l’index de la bibliothèque d’assets
+
+# `schems/index.json` est ce qui permet à l’Asset Placer d’afficher ses ~900
+# assets sans télécharger ~900 fichiers. S’il n’est pas régénéré après un
+# ajout/modification de schem, la liste devient fausse (assets manquants,
+# tailles erronées). Ce contrôle bloque le PR dans ce cas.
+
+on:
+  pull_request:
+    paths:
+      - 'schems/**'
+      - 'manifest.json'
+      - 'asset_placer-core.js'
+      - 'asset_placer-ui.js'
+      - 'tools/build-asset-index.mjs'
+  push:
+    branches: [main]
+    paths:
+      - 'schems/**'
+      - 'manifest.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Régénérer l’index et comparer
+        run: |
+          node tools/build-asset-index.mjs --quiet --check \
+            || { echo "::error::schems/index.json est périmé — exécutez « node tools/build-asset-index.mjs » et commitez le résultat."; exit 1; }

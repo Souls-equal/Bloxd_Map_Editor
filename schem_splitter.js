@@ -298,13 +298,8 @@ function encodeUnit(unit,name){
     return encodeSchem(name,chunkMap,sx,sy,sz);
 }
 
-// ─── Block colors ───
-const COLORS={2:0x6b4423,4:0x4ea64e,5:0xe8d98a,9:0x7a4d2a,10:0x6a4a2f,28:0x7d7d7d,31:0x949494,38:0xd9c48a,100:0x2f6f2d,101:0x8fb35a,102:0x3f8f35,103:0x4f8a3a};
-function blockColor(id){
-    if(COLORS[id]!==undefined)return COLORS[id];
-    let h=id;h=((h>>>16)^h)*0x45d9f3b;h=((h>>>16)^h)*0x45d9f3b;h=(h>>>16)^h;
-    return 0x404040|((h&0xffffff)&0x7f7f7f);
-}
+// ─── Block colors (palette unifiée — block_colors.js) ───
+function blockColor(id){return(typeof BloxdBlockColors!=='undefined')?BloxdBlockColors.hex(id):0x808080;}
 // Couleur hex d'une unité = même formule HSV que renderPreview (h=i*137.5, s=0.6, v=0.9).
 // Sert à afficher le carré de couleur à côté du nom dans le panneau.
 function unitColorHex(i){

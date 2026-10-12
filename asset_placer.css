@@ -604,6 +604,38 @@ body {
     text-align: center;
     cursor: pointer;
     transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    /* PERF : la bibliothèque peut contenir ~900 cartes. `content-visibility`
+       met en attente le rendu des cartes hors écran (le navigateur ne pose que
+       ce qui est visible) — sur un portable modeste, c'est la différence entre
+       un panneau qui s'affiche à la seconde et un panneau qui fige 2 s. */
+    content-visibility: auto;
+    contain-intrinsic-size: 112px 84px;
+}
+
+/* Entrée listée via l'index mais fichier pas encore téléchargé. */
+.asset-card-small.is-pending .asset-icon { opacity: .72; }
+.asset-card-small.is-loading {
+    position: relative;
+    cursor: progress;
+    border-color: #4aa8ff;
+}
+.asset-card-small.is-loading::after {
+    content: "";
+    position: absolute;
+    left: 10%; right: 10%; bottom: 5px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, #4aa8ff, transparent);
+    animation: bloxdAssetSweep .9s linear infinite;
+}
+@keyframes bloxdAssetSweep {
+    0%   { transform: translateX(-35%); opacity: .25; }
+    50%  { opacity: 1; }
+    100% { transform: translateX(35%);  opacity: .25; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .asset-card-small { transition: none; }
+    .asset-card-small.is-loading::after { animation: none; opacity: .8; }
 }
 
 .asset-card-small:hover {

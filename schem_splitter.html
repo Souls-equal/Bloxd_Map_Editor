@@ -6,6 +6,11 @@
     <title>Bloxd Tools — Schem Splitter v6.7.3</title>
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAKlBMVEVHcEwAAAD///+mBwWPj4+6urr/AgDJBALgEhDdCQcAADVAQEAAANMwMDDLTWdNAAAAAXRSTlMAQObYZgAAAEVJREFUCNdjYMAGGAUgtKBkIYRvOK0dLMRomZYBFmKckZYGFhI2BgJDIEMkSElJ1RHECFwNZUSdxsmIvQthMAoCgQDCZgAI7xCncUnAaQAAAABJRU5ErkJggg==">
     <link rel="stylesheet" href="schem_splitter.css">
+    <link rel="preconnect" href="https://cdn.babylonjs.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.babylonjs.com">
+    <!-- Le moteur 3D (~4 Mo) part en parallèle du CSS au lieu d'attendre la fin du document -->
+    <link rel="preload" as="script" href="https://cdn.babylonjs.com/babylon.js">
 </head>
 <body>
     <div id="topbar">
@@ -32,9 +37,11 @@
     <div id="info-panel"></div>
     <div id="drop-overlay"><div class="drop-msg">📥 Drop your .bloxdschem here</div></div>
 
-    <script src="https://cdn.babylonjs.com/babylon.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="schem_splitter.js"></script>
-    <script src="welcome.js"></script>
+    <script defer src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script defer src="block_colors.js"></script>
+    <script defer src="schem_splitter.js"></script>
+    <script defer src="welcome.js"></script>
+    <script defer src="app-cache.js"></script>
 </body>
 </html>
