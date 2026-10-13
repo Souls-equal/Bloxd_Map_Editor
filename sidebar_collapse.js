@@ -1,10 +1,19 @@
 /**
- * sidebar_collapse.js — Replier / déplier les blocs de la sidebar (Terrain Editor)
+ * sidebar_collapse.js — Replier / déplier / masquer les blocs de la sidebar (Terrain Editor)
  * ═══════════════════════════════════════════════════════════════════════════
- * Chaque bloc de #app-panel (aide, formats, sections du formulaire, bloc
- * « Reprendre plus tard ») peut être replié en cliquant sur son titre.
- * Seul le titre reste visible. L'état est mémorisé dans localStorage.
- * Tout est déplié par défaut.
+ * 1) Chaque bloc de #app-panel (aide, formats, sections du formulaire, bloc
+ *    « Reprendre plus tard ») peut être replié en cliquant sur son titre.
+ *    Seul le titre reste visible. L'état est mémorisé dans localStorage.
+ *    Tout est déplié par défaut.
+ *
+ * 2) Les deux cartes d'aide (« 3 étapes pour ne pas se perdre » et « Quel
+ *    fichier pour quoi ? ») ont une croix ✕ qui les masque complètement.
+ *    Volontairement NON mémorisé : un rechargement de page les fait revenir,
+ *    l'aide ne peut donc jamais être perdue définitivement.
+ *
+ * 3) La zone « Téléchargement » (bouton d'export + astuce) se cache derrière
+ *    sa barre de titre : flèche ▼ = cacher, flèche ▲ = remontrer. Cet état-là
+ *    EST mémorisé, mais la barre reste toujours visible.
  */
 (function () {
     'use strict';
@@ -75,4 +84,46 @@
             }
         });
     });
+
+    /* ═══════════════════════════════════════════════════════════════
+       2) Croix ✕ : masquer complètement une carte d'aide
+       ───────────────────────────────────────────────────────────────
+       Rien n'est écrit dans localStorage : la carte masquée revient au
+       prochain rechargement de la page (l'aide reste toujours accessible).
+       ═══════════════════════════════════════════════════════════════ */
+    Array.prototype.forEach.call(panel.querySelectorAll('[data-dismiss-card]'), function (btn) {
+        var card = btn.closest ? btn.closest('.coach-card, .format-card') : null;
+        if (!card) return;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();   // ne pas déclencher le repliage du titre au passage
+            card.classList.add('is-dismissed');
+        });
+    });
+
+    /* ═══════════════════════════════════════════════════════════════
+       3) Zone « Téléchargement » : flèche ▼ pour cacher, ▲ pour remontrer
+       ───────────────────────────────────────────────────────────────
+       La barre « Téléchargement » reste affichée même zone cachée : on ne
+       peut donc jamais perdre le bouton d'export. État mémorisé.
+       ═══════════════════════════════════════════════════════════════ */
+    var EXPORT_ZONE_KEY = 'terrainEditor.exportZoneHidden';
+    var exportZone = document.getElementById('export-zone');
+    var exportToggle = document.getElementById('export-zone-toggle');
+
+    if (exportZone && exportToggle) {
+        var setExportZone = function (hidden) {
+            exportZone.classList.toggle('is-hidden', hidden);
+            exportToggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+            try { localStorage.setItem(EXPORT_ZONE_KEY, hidden ? '1' : '0'); }
+            catch (e) { /* stockage indisponible (iframe bloquée) : le réglage ne survit pas */ }
+        };
+
+        var exportHidden = false;
+        try { exportHidden = localStorage.getItem(EXPORT_ZONE_KEY) === '1'; } catch (e) { exportHidden = false; }
+
+        setExportZone(exportHidden);
+        exportToggle.addEventListener('click', function () {
+            setExportZone(!exportZone.classList.contains('is-hidden'));
+        });
+    }
 })();
