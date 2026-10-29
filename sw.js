@@ -111,7 +111,10 @@ async function networkFirst(req) {
     let cache = null;
     try { cache = await caches.open(CACHE_CODE); } catch (e) { /* ignore */ }
     try {
-        const res = await fetch(req);
+        // `fetch(req)` peut encore utiliser le cache HTTP frais (10 min sur
+        // GitHub Pages) et servir l'ancien JavaScript malgré ce service worker.
+        // Revalider le code garantit qu'un simple rechargement voit la mise à jour.
+        const res = await fetch(new Request(req, { cache: 'no-cache' }));
         if (cache && res && res.ok && res.type === 'basic') {
             cache.put(req, res.clone()).catch(() => {});
         }
