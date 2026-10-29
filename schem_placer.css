@@ -315,3 +315,18 @@ input[type="file"] { display: none; }
     backdrop-filter: blur(6px); transition: background .15s, border-color .15s;
 }
 .home-corner-btn:hover { background: rgba(48,56,78,0.95); border-color: var(--border-light); }
+
+/* L'aperçu reste hors du panneau défilant et ne capture pas la souris. */
+.schem-hover-preview {
+    position: fixed; z-index: 1000; width: 240px; max-width: calc(100vw - 8px);
+    padding: 9px; pointer-events: none; background: #1c202b;
+    border: 1px solid var(--border-light); border-radius: 5px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); color: var(--text);
+}
+.schem-hover-preview[hidden], .schem-hover-preview [hidden] { display: none; }
+.schem-preview-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.schem-hover-preview canvas, .schem-preview-status {
+    display: block; width: 100%; height: 170px; margin-top: 6px;
+    background: #262d3b; border-radius: 3px;
+}
+.schem-preview-status { display: flex; align-items: center; justify-content: center; padding: 12px; color: var(--muted); text-align: center; font-size: 12px; }

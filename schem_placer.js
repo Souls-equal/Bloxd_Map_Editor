@@ -813,6 +813,7 @@ const i18nMap = {
         copy_done: 'Partie copiée.',
         open:'Ouvrir', export:'Exporter', mode_select:'Souris', mode_move:'Déplacer', mode_scale:'Séparer', mode_multi:'Multi', clear:'Vider',
         dim:'Dimensions', pos:'Position', blocks:'Blocs', color:'Couleur', step:'Pas :', blocks_unit:'bloc(s)', shift_hint:'Maintenir Maj pour ×10', rename:'Renommer',
+        preview_loading:'Chargement de l’aperçu…', preview_empty:'Aperçu indisponible',
         schems:'Schems', no_schem:'Aucun schem. Glisse un .bloxdschem / .zip, ou', open_hint:'cliquez sur Ouvrir',
         cut_title:'✂️ Séparer', cut_extract:'✂️ Couper', cut_copy:'📑 Dupliquer',
         multi_title:'🔲 Multi-sélection —', schems_word:'schem(s)', multi_union:'🔗 Unir', multi_split:'✂️ Désunir', multi_export:'💾 Exporter',
@@ -872,6 +873,7 @@ const i18nMap = {
         copy_done: 'Part copied.',
         open:'Open', export:'Export', mode_select:'Mouse', mode_move:'Move', mode_scale:'Separate', mode_multi:'Multi', clear:'Clear',
         dim:'Dimensions', pos:'Position', blocks:'Blocks', color:'Color', step:'Step:', blocks_unit:'block(s)', shift_hint:'Hold Shift for ×10', rename:'Rename',
+        preview_loading:'Loading preview…', preview_empty:'Preview unavailable',
         schems:'Schems', no_schem:'No schems. Drop a .bloxdschem / .zip, or', open_hint:'click Open',
         cut_title:'✂️ Separate', cut_extract:'✂️ Cut', cut_copy:'📑 Duplicate',
         multi_title:'🔲 Multi-select —', schems_word:'schem(s)', multi_union:'🔗 Union', multi_split:'✂️ Split', multi_export:'💾 Export',
@@ -1465,7 +1467,10 @@ function updateInspector() {
 /* =====================================================
    LIST RENDER
    ===================================================== */
+let schemHoverPreview = null;
+
 function renderList() {
+    if (schemHoverPreview && schemHoverPreview.instance && !state.instances.includes(schemHoverPreview.instance)) schemHoverPreview.hide();
     const list = document.getElementById('schem-list-inner');
     if (!list) return;
     const noMsg = document.getElementById('no-schem-msg');
@@ -1504,6 +1509,7 @@ function createNoMsg() {
 function createSchemItem(inst) {
     const div = document.createElement('div');
     div.className = 'schem-item'; div.dataset.id = inst.id;
+    if (schemHoverPreview) schemHoverPreview.attach(div, inst);
     const color = document.createElement('div'); color.className = 'schem-color';
     const info = document.createElement('div'); info.className = 'schem-info';
     const name = document.createElement('div'); name.className = 'schem-name';
@@ -1660,6 +1666,7 @@ function cancelCut() {
 }
 
 function performCut(remove) {
+    if (schemHoverPreview) schemHoverPreview.hide();
     const d = state.cutBoxData; if (!d) return;
     const inst = d.inst;
     if (d.x1 - d.x0 < 0 || d.y1 - d.y0 < 0 || d.z1 - d.z0 < 0) { alert('Sélection invalide.'); return; }
@@ -2417,7 +2424,10 @@ function initUI() {
     document.getElementById('sel-color').addEventListener('input',e=>{ const i=state.selected; if(!i)return; i.color=parseInt(e.target.value.slice(1),16); renderList(); SchemPlacerBabylon.updateOutline(); });
     const sl=document.getElementById('step-slider'), sv=document.getElementById('step-val');
     sl.addEventListener('input',()=>{state.step=parseInt(sl.value,10);sv.textContent=state.step;updateStatusBar();});
-    document.getElementById('schem-header').addEventListener('click',()=>document.getElementById('schem-panel').classList.toggle('collapsed'));
+    schemHoverPreview = new SchemHoverPreview(document.getElementById('schem-list-inner'), document.getElementById('schem-panel'), i18n);
+    document.getElementById('schem-header').addEventListener('click', () => {
+        if (document.getElementById('schem-panel').classList.toggle('collapsed')) schemHoverPreview.hide();
+    });
     document.getElementById('btn-cut-cancel').addEventListener('click',()=>{cancelCut(); setMode('select');});
     document.getElementById('btn-cut-extract').addEventListener('click',()=>performCut(true));
     document.getElementById('btn-cut-copy').addEventListener('click',()=>performCut(false));
