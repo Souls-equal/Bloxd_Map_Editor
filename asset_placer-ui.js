@@ -685,6 +685,7 @@ window.LibraryUI = class LibraryUI {
 
         toggleBtn.addEventListener('click', () => {
             const collapsed = sidebar.classList.toggle('collapsed');
+            if (collapsed) this._hidePreview();
             toggleBtn.textContent = collapsed ? '▶' : '◀';
             reopenTab.classList.toggle('visible', collapsed);
             if (window.appResize) window.appResize();
@@ -920,6 +921,7 @@ window.LibraryUI = class LibraryUI {
         this._renderTagFilters();
         const grid = this._grid();
         if (!grid) return;
+        this._hidePreview();
         this._ensureGridDelegation(grid);
         const names = this._allNames();
         const filtered = names.filter(n => this._assetMatchesFilters(n));
@@ -959,7 +961,7 @@ window.LibraryUI = class LibraryUI {
             `<div class="asset-size"></div>`;
         card.querySelector('.asset-name').textContent = name;
         card.querySelector('.asset-size').textContent = sizeTxt;
-        card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
+        card.setAttribute('aria-label', `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`);
         return card;
     }
 
@@ -1011,7 +1013,7 @@ window.LibraryUI = class LibraryUI {
         card.classList.toggle('is-pending', !!meta.pending);
         const sizeEl = card.querySelector('.asset-size');
         if (sizeEl) sizeEl.textContent = `${bc.toLocaleString('fr-FR')} · ${sz.x}×${sz.y}×${sz.z}`;
-        card.title = `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`;
+        card.setAttribute('aria-label', `${name} — ${bc} ${window.I18N.t('blocksShort')} · ${sz.x}×${sz.y}×${sz.z}`);
     }
 
     /**
@@ -1024,17 +1026,127 @@ window.LibraryUI = class LibraryUI {
         const cardOf = (e) => e.target.closest ? e.target.closest('.asset-card-small') : null;
         grid.addEventListener('click', (e) => {
             const card = cardOf(e);
-            if (card && card.dataset.asset) this._activateAsset(card.dataset.asset, card);
+            if (card && card.dataset.asset) { this._hidePreview(); this._activateAsset(card.dataset.asset, card); }
         });
-        // Survol = préchargement : au clic, l'asset est déjà décodé.
+        // Une seule infobulle pour toute la grille ; aucun rendu ni chargement
+        // supplémentaire tant que la souris ne s'arrête pas sur une carte.
         grid.addEventListener('pointerover', (e) => {
+            if (e.pointerType === 'touch') return;
             const card = cardOf(e);
-            if (!card || !card.dataset.asset) return;
-            if (card.dataset.prefetched) return;
-            card.dataset.prefetched = '1';
-            const loader = window.appSchematicLibraryLoader;
-            if (loader && typeof loader.prefetch === 'function') loader.prefetch(card.dataset.asset);
+            if (!card || !card.dataset.asset || card.contains(e.relatedTarget)) return;
+            this._hidePreview();
+            this._previewCard = card;
+            this._previewTimer = setTimeout(() => this._showPreview(card), 180);
         }, { passive: true });
+        grid.addEventListener('pointerout', (e) => {
+            const card = cardOf(e);
+            if (card && card === this._previewCard && !card.contains(e.relatedTarget)) this._hidePreview();
+        }, { passive: true });
+        grid.addEventListener('scroll', () => this._hidePreview(), { passive: true });
+        window.addEventListener('resize', () => this._hidePreview());
+        window.addEventListener('blur', () => this._hidePreview());
+    }
+
+    _hidePreview() {
+        clearTimeout(this._previewTimer);
+        this._previewTimer = null;
+        this._previewCard = null;
+        if (this._previewEl) this._previewEl.hidden = true;
+    }
+
+    async _showPreview(card) {
+        if (this._previewCard !== card || !card.isConnected) return;
+        if (!this._previewEl) {
+            const preview = document.createElement('div');
+            preview.className = 'asset-hover-preview';
+            preview.setAttribute('aria-hidden', 'true');
+            preview.innerHTML = '<div class="asset-preview-name"></div><canvas width="440" height="340"></canvas><div class="asset-preview-status"></div>';
+            document.body.appendChild(preview);
+            this._previewEl = preview;
+        }
+        const preview = this._previewEl;
+        const name = card.dataset.asset;
+        const canvas = preview.querySelector('canvas');
+        const status = preview.querySelector('.asset-preview-status');
+        preview.querySelector('.asset-preview-name').textContent = name;
+        canvas.hidden = true;
+        status.hidden = false;
+        status.textContent = window.I18N.t('previewLoading');
+        preview.hidden = false;
+        // Sortir de la zone défilante, sans jamais déborder de la fenêtre.
+        const rect = card.getBoundingClientRect();
+        const width = preview.offsetWidth, height = preview.offsetHeight;
+        const sidebar = document.getElementById('library-sidebar');
+        const right = (sidebar ? sidebar.getBoundingClientRect().right : rect.right) + 10;
+        const left = right + width <= window.innerWidth ? right : rect.left - width - 10;
+        preview.style.left = Math.max(4, Math.min(left, window.innerWidth - width - 4)) + 'px';
+        preview.style.top = Math.max(4, Math.min(rect.top, window.innerHeight - height - 4)) + 'px';
+
+        const loader = window.appSchematicLibraryLoader;
+        try {
+            if (!this.assetManager.getTemplateSchem(name) && loader) await loader.ensureTemplateLoaded(name);
+            // Un téléchargement peut finir après le départ de la souris ou un filtrage.
+            if (this._previewCard !== card || !card.isConnected) return;
+            const schem = this.assetManager.getTemplateSchem(name);
+            if (!schem || !this._drawPreview(canvas, schem)) throw new Error('Empty schematic');
+            status.hidden = true;
+            canvas.hidden = false;
+        } catch (err) {
+            if (this._previewCard !== card || !card.isConnected) return;
+            status.textContent = window.I18N.t('assetLoadError');
+        }
+    }
+
+    // Projection isométrique fixe (+X, +Y, +Z), indépendante de la caméra
+    // de l'éditeur. Seules les faces exposées sont dessinées, du fond vers l'avant.
+    _drawPreview(canvas, schem) {
+        const blocks = (schem.blocks || []).filter(b => b && b.id !== 0);
+        if (!blocks.length) return false;
+        let minX = Infinity, minY = Infinity, minZ = Infinity;
+        let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+        for (const b of blocks) {
+            minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x);
+            minY = Math.min(minY, b.y); maxY = Math.max(maxY, b.y);
+            minZ = Math.min(minZ, b.z); maxZ = Math.max(maxZ, b.z);
+        }
+        const sx = maxX - minX + 1, sy = maxY - minY + 1, sz = maxZ - minZ + 1;
+        const key = (x, y, z) => `${x},${y},${z}`;
+        const occupied = new Set(blocks.map(b => key(b.x, b.y, b.z)));
+        blocks.sort((a, b) => (a.x + a.y + a.z) - (b.x + b.y + b.z));
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Les sommets du volume projeté donnent un cadrage constant pour tout asset.
+        const project = (x, y, z) => [(x - z) * Math.sqrt(3) / 2, (x + z) / 2 - y];
+        const projWidth = (sx + sz) * Math.sqrt(3) / 2;
+        const projHeight = (sx + sz) / 2 + sy;
+        const scale = Math.min((canvas.width - 36) / projWidth, (canvas.height - 36) / projHeight);
+        const centerX = canvas.width / 2 - (sx - sz) * Math.sqrt(3) / 4 * scale;
+        const centerY = canvas.height / 2 - ((sx + sz) / 4 - sy / 2) * scale;
+        const point = (x, y, z) => {
+            const p = project(x, y, z);
+            return [centerX + p[0] * scale, centerY + p[1] * scale];
+        };
+        const face = (corners, color, shade) => {
+            const r = Math.round(((color >> 16) & 255) * shade);
+            const g = Math.round(((color >> 8) & 255) * shade);
+            const b = Math.round((color & 255) * shade);
+            ctx.fillStyle = `rgb(${r},${g},${b})`;
+            ctx.beginPath();
+            corners.forEach((v, i) => { const p = point(...v); if (i) ctx.lineTo(...p); else ctx.moveTo(...p); });
+            ctx.closePath();
+            ctx.fill();
+        };
+        for (const b of blocks) {
+            const x = b.x - minX, y = b.y - minY, z = b.z - minZ;
+            const color = window.BlockColors ? window.BlockColors.getBlockColor(b.id) : 0x808080;
+            if (!occupied.has(key(b.x, b.y, b.z + 1)))
+                face([[x,y,z+1],[x+1,y,z+1],[x+1,y+1,z+1],[x,y+1,z+1]], color, 0.72);
+            if (!occupied.has(key(b.x + 1, b.y, b.z)))
+                face([[x+1,y,z],[x+1,y,z+1],[x+1,y+1,z+1],[x+1,y+1,z]], color, 0.86);
+            if (!occupied.has(key(b.x, b.y + 1, b.z)))
+                face([[x,y+1,z],[x+1,y+1,z],[x+1,y+1,z+1],[x,y+1,z+1]], color, 1);
+        }
+        return true;
     }
 
     /**

@@ -1201,3 +1201,45 @@ body {
     backdrop-filter: blur(6px); transition: background .15s, border-color .15s;
 }
 .home-corner-btn:hover { background: rgba(48,56,78,0.95); border-color: #4d5774; }
+
+/* L'aperçu est hors de la grille défilante et ne capte jamais la souris. */
+.asset-hover-preview {
+    position: fixed;
+    z-index: 1500;
+    width: 240px;
+    max-width: calc(100vw - 8px);
+    padding: 9px;
+    box-sizing: border-box;
+    pointer-events: none;
+    background: #1c202b;
+    border: 1px solid #4a5870;
+    border-radius: 5px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+    color: #dce5f4;
+}
+.asset-hover-preview[hidden], .asset-hover-preview [hidden] { display: none; }
+.asset-preview-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+}
+.asset-hover-preview canvas, .asset-preview-status {
+    display: block;
+    width: 100%;
+    height: 170px;
+    margin-top: 6px;
+    background: #262d3b;
+    border-radius: 3px;
+}
+.asset-preview-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 12px;
+    box-sizing: border-box;
+    color: #aab8ce;
+    font-size: 12px;
+}
